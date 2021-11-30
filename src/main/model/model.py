@@ -18,10 +18,16 @@ class Recipe:
     products: List[Product]
 
 
-@dataclass_json
-@dataclass(frozen=True)
-class AvailableProducts:
-    available_products: List[Product]
+# @dataclass_json
+# @dataclass(frozen=True)
+# class AvailableProducts:
+#     available_products: List[Product]
+#
+#
+# @dataclass_json
+# @dataclass(frozen=True)
+# class SeparateProducts:
+#     separate_products: List[Product]
 
 
 @dataclass_json
@@ -38,6 +44,7 @@ class User:
     id: int
     plan: List[DayPlan]
     available_products: List[Product]
+    separate_products: List[Product]
 
     def show_grocery_list(self):
         dct = {}
@@ -49,9 +56,13 @@ class User:
                     else:
                         dct[product.name] = product.quantity
 
+        for product in self.separate_products:
+            if product.name in dct:
+                dct[product.name] += product.quantity
+
         for product in self.available_products:
             if product.name in dct:
-                dct[product.name] -= product.quantity
+                dct[product.name] -= min(product.quantity, dct[product.name])
         return dct
 
 
@@ -101,6 +112,18 @@ if __name__ == '__main__':
           ]
         }
       ]
+    }
+  ],
+  "separate_products": [
+    {
+      "name": "chocolate",
+      "quantity": 1,
+      "units": "u"
+    },
+    {
+      "name": "cheese",
+      "quantity": 500,
+      "units": "g"
     }
   ],
   "available_products": [

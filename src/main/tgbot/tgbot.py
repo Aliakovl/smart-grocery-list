@@ -1,5 +1,6 @@
 from telebot import types, TeleBot
 from os import getenv
+from src.main.model.model import *
 
 TOKEN = getenv('TELEGRAM_TOKEN')
 bot = TeleBot(token=TOKEN)
@@ -12,9 +13,22 @@ markup.row(add_recipe_button)
 markup.row(add_item_button)
 
 
+def make_init_buttons():
+    init_markup = types.ReplyKeyboardMarkup(True, False)
+    add_init_button = types.KeyboardButton('Помощь')
+    init_markup.row(add_init_button)
+
+
+states = [""]   # в каком состоянии сейчас пользователь.
+# где хранить данные?
+
+
+
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    bot.send_message(message.chat.id, "На сколько дней вперёд вы планируете меню", reply_markup=markup)
+    new_user = User(message.chat.id, [], [])   # пустой пользователь
+    bot.send_message(message.chat.id, "На сколько дней вперёд вы планируете меню?", reply_markup=markup)
+
     # bot.send_message(message.chat.id, "Выбери действие", reply_markup=markup)
 
 
