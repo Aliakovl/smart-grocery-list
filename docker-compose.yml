@@ -4,11 +4,10 @@ services:
     build: src/main/tgbot
     ports:
       - "1234:1234"
-      -
     environment:
       - TELEGRAM_TOKEN=secret1
       - SECRET_KEY_BASE=secret2
       - MONGO_URL=mongodb://mongo:27017/app_development
-  mongo:
-    ports:
-      - "27017:27017"
+#  mongo:
+#    ports:
+#      - "27017:27017"

@@ -14,7 +14,8 @@ markup.row(add_item_button)
 
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    bot.send_message(message.chat.id, "Выбери действие", reply_markup=markup)
+    bot.send_message(message.chat.id, "На сколько дней вперёд вы планируете меню", reply_markup=markup)
+    # bot.send_message(message.chat.id, "Выбери действие", reply_markup=markup)
 
 
 @bot.message_handler(regexp=r'(.*)')
