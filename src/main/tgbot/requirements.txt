@@ -1,0 +1,2 @@
+pytelegrambotapi==4.2.0
+dataclasses_json==0.5.6
