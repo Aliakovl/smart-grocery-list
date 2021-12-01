@@ -1,13 +1,13 @@
 from mongoengine import *
 from copy import deepcopy
 
-#TODO: delete this
+# TODO: delete this
 '''import datetime
-date_time_str = 'Jun 28 2018 7:40AM'
-date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')'''
 
-con = connect('test_db_2', host='localhost', port=27017) # подключение к бд
-#  для основной базы нужно будет поменять название и тд
+date_time_str = 'Jun 28 2018 7:40AM'
+date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')
+
+con = connect('test_db_2', host='localhost', port=27017)'''
 
 
 class Product(Document):
@@ -169,12 +169,20 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     u.modify(push__separate_products=new_product)
 
 
-def add_new_day(u_id, day_date, day='Monday'):
+def add_new_day(u_id, day_date, day='Monday', *recipes):
     u = User.objects.get(user_id=u_id)
-    if not is_exist_day(u, day_date):
-        new_day = Day_plan(date=day_date, day=day, recipes=[])
+    new_day = is_exist_day(u, day_date)
+    if new_day == False:
+        new_day = Day_plan(date=day_date, day=day, recipes=recipes)
         new_day.save()
         u.modify(push__full_plan=new_day)
+    else:
+        day_info = Day_plan.objects.filter(date=day_date, day=new_day.day, recipes=new_day.recipes)[0]
+        u_fp = u.full_plan
+        u_fp.remove(new_day)
+        u.modify(full_plan=u_fp)
+        day_info.modify(push__recipes=recipes[0])
+        u.modify(push__full_plan=day_info)
 
 
 def make_new_recipe(recipe_name, recipe_description='', *products):
@@ -185,20 +193,10 @@ def make_new_recipe(recipe_name, recipe_description='', *products):
     new_recipe.save()
     return new_recipe
 
+
 # в работе
-'''def add_recipe_to_day(u_id, day_date, recipe, *day):
-    add_new_day(u_id, day_date, *day)
-    u = User.objects.get(user_id=u_id)
-    if is_recipe_in_day(u, day_date, recipe.name):
-        print('you already use this name for recipe')
-        return
-    actual_day = get_day(u, day_date)
-    actual_day.recipes.append(recipe)
-    delete_single_day(u_id, day_date)
-    print_all_user_info(u_id)
-    u_n = User.objects.get(user_id=u_id)
-    u_n.modify(push__full_plan=actual_day)
-    print_all_user_info(u_id)'''
+def add_recipe_to_day(u_id, day_date, recipe, *day):
+    add_new_day(u_id, day_date, day, recipe)
 
 
 # ----- блок с функциями проверки "is in" ------
@@ -220,7 +218,7 @@ def is_in_separate_products(user, product_name):
 def is_exist_day(user, day_date):
     for day in user.full_plan:
         if day.date == day_date:
-            return True
+            return day
     return False
 
 
@@ -237,6 +235,7 @@ def is_recipe_in_day(user, day_date, recipe_name):
             return True
     return False
 
+
 # ---- get функции ----
 
 
@@ -244,7 +243,7 @@ def get_day(user, day_date):
     for day in user.full_plan:
         if day.date == day_date:
             return day
-
+    return 0
 
 
 # функция вспомогательная, для отладки
@@ -255,14 +254,13 @@ def print_all_user_info(u_id):
         res_str += f' date -{rec.date},'
         res_str += f'rec_count={len(rec.recipes)},'
         res_str += f'rec={rec.recipes}'
-    '''res_str += '; availible products:'
+    res_str += '; availible products:'
     for a_pr in u.availible_products:
         res_str += f'product - {a_pr.name},cou = {a_pr.quantity}'
     res_str += '; sep products:'
     for s_pr in u.separate_products:
-        res_str += f'sep product - {s_pr.name}, cou = {s_pr.quantity}'''
+        res_str += f'sep product - {s_pr.name}, cou = {s_pr.quantity}
     print(res_str)
-
 
 
 '''User.objects(user_id=16).delete()
@@ -296,11 +294,19 @@ second_day.save()'''
 new_user.save()
 
 print_all_user_info(16)
-
+tom2 = Product(name='tomato', quantity=3, unit='kg')
+tom2.save()
 prod1 = make_product('bread', 1, 'kg')
 prod2 = make_product('sugar', 0.6, 'kg')
+prod3 = make_product('sugar', 0.6, 'kg')
 add_new_day(16, datetime.date.today())
 recipe1 = make_new_recipe('buter', 'vkusno', [prod1, prod2])
+recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', [prod3, tom2])
 add_recipe_to_day(16, datetime.date.today(), recipe1)
+add_recipe_to_day(16, datetime.date.today(), recipe2)
+
+print_all_user_info(16)
+
+delete_all_user_info(16)
 
 print_all_user_info(16)'''
