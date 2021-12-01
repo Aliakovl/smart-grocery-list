@@ -1,13 +1,15 @@
 from mongoengine import *
-from copy import deepcopy
 
 # TODO: delete this
 '''import datetime
 
 date_time_str = 'Jun 28 2018 7:40AM'
-date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')
+date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')'''
 
-con = connect('test_db_2', host='localhost', port=27017)'''
+
+# подключение к базу, по default указать имя и адрес нашей базы, где все вертится
+def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
+    con = connect(base_name, host=base_host, port=base_port)
 
 
 class Product(Document):
@@ -146,9 +148,10 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_available_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            #  TODO: перевод единиц измерения
+            # TODO: перевод единиц измерения
             pass
-        else:  # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
+        else:
+            # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
             modify_prod.modify(inc__quantity=p_qua)
             return
     new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
@@ -162,7 +165,7 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_separate_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            #  TODO: перевод единиц измерения
+            # TODO: перевод единиц измерения
             pass
         else:  # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
             modify_prod.modify(inc__quantity=p_qua)
@@ -279,7 +282,42 @@ def give_all_recipes(u_id):
     return res_dict
 
 
+# получение всей продуктовой корзины
+# возвращает словарь продукт:([количество, единица измерения])
+# TODO: могут быть проблемы с единициами измерения
+def give_grocery_list(u_id):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    for day_rec in u.full_plan:
+        for rec in day_rec.recipes:
+            for prod in rec.products:
+                if prod.name in dict_grocery:
+                    el = dict_grocery[prod.name]
+                    el[0] += prod.quantity
+                    dict_grocery[prod.name] = el
+                else:
+                    dict_grocery[prod.name] = [prod.quantity, prod.unit]
+    for cep_prod in u.separate_products:
+        if cep_prod.name in dict_grocery:
+            el = dict_grocery[cep_prod.name]
+            el[0] += cep_prod.quantity
+            dict_grocery[cep_prod.name] = el
+        else:
+            dict_grocery[cep_prod.name] = [cep_prod.quantity, cep_prod.unit]
+    for av_prod in u.availible_products:
+        if av_prod.name in dict_grocery:
+            el = dict_grocery[av_prod.name]
+            print(el[0])
+            el[0] -= av_prod.quantity
+            if el[0] <= 0:
+                dict_grocery.pop(av_prod.name)
+            else:
+                dict_grocery[av_prod.name] = el
+    return dict_grocery
+
+
 # функция вспомогательная, для отладки
+# TODO: delete this
 def print_all_user_info(u_id):
     u = User.objects.get(user_id=u_id)
     res_str = "User id: " + str(u.user_id) + "; user_plan:"
@@ -296,7 +334,11 @@ def print_all_user_info(u_id):
     print(res_str)
 
 
-'''User.objects(user_id=16).delete()
+# TODO: delete comments
+# можно запустить, посмотреть, как работает на тестах
+'''
+connect_to_base()
+User.objects(user_id=16).delete()
 tom = Product(name='tomato', quantity=3, unit='kg')
 tom.save()
 milk = Product(name='milk', quantity=1, unit='l')
@@ -339,5 +381,8 @@ add_recipe_to_day(16, datetime.date.today(), recipe2)
 
 print_all_user_info(16)
 
-all_recipes = give_all_recipes(16)
-print(all_recipes)'''
+
+l = give_grocery_list(16)
+print(l)
+for el in l:
+    print(l[el][0])'''
