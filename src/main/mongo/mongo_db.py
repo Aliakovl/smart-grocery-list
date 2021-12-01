@@ -122,7 +122,6 @@ def delete_sep_product(u_id, product_name):
     for prod in u.separate_products:
         if prod.name == product_name:
             del_prod = prod
-            print(del_prod)
             break
         print("no such separate product")
         return
@@ -133,12 +132,15 @@ def delete_sep_product(u_id, product_name):
 
 
 #  ----- блок с функциями добавления -----
+
+# создание продукта (вспомогательная функция для создания рецепта)
 def make_product(product_name, product_quantity, product_unit):
     new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit)
     new_product.save()
     return new_product
 
 
+# пополнить список продуктов, которые уже есть у пользователя
 def add_to_available_products(u_id, p_name, p_qua, p_unit):
     u = User.objects.get(user_id=u_id)
     modify_prod = is_in_available_products(u, p_name)
@@ -154,6 +156,7 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     u.modify(push__availible_products=new_product)
 
 
+# пополнить список продуктов, которые нужно купить просто так
 def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     u = User.objects.get(user_id=u_id)
     modify_prod = is_in_separate_products(u, p_name)
@@ -169,6 +172,7 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     u.modify(push__separate_products=new_product)
 
 
+# добавляем новый день/ обновляем информацию о нем
 def add_new_day(u_id, day_date, day='Monday', *recipes):
     u = User.objects.get(user_id=u_id)
     new_day = is_exist_day(u, day_date)
@@ -185,6 +189,7 @@ def add_new_day(u_id, day_date, day='Monday', *recipes):
         u.modify(push__full_plan=day_info)
 
 
+# создание нового рецепта (вспомогательная функция, нужна для добавления рецепта в конкретный день)
 def make_new_recipe(recipe_name, recipe_description='', *products):
     if isinstance(products[0], list):
         new_recipe = Recipe(name=recipe_name, description=recipe_description, products=products[0])
@@ -194,13 +199,15 @@ def make_new_recipe(recipe_name, recipe_description='', *products):
     return new_recipe
 
 
-# в работе
+# добавление нового рецепта в план
 def add_recipe_to_day(u_id, day_date, recipe, *day):
     add_new_day(u_id, day_date, day, recipe)
 
 
 # ----- блок с функциями проверки "is in" ------
 
+
+# проверка, есть ли уже продукт в перечне доступных продуктов
 def is_in_available_products(user, product_name):
     for av_p in user.availible_products:
         if av_p.name == product_name:
@@ -208,6 +215,7 @@ def is_in_available_products(user, product_name):
     return False
 
 
+# проверка, есть ли уже продукт в корзине(независимый от рецепта)
 def is_in_separate_products(user, product_name):
     for av_p in user.separate_products:
         if av_p.name == product_name:
@@ -215,6 +223,7 @@ def is_in_separate_products(user, product_name):
     return False
 
 
+# проверка, есть ли уже информация об этом дне
 def is_exist_day(user, day_date):
     for day in user.full_plan:
         if day.date == day_date:
@@ -222,6 +231,7 @@ def is_exist_day(user, day_date):
     return False
 
 
+# проверка, есть ли рецепт в плане на день
 def is_recipe_in_day(user, day_date, recipe_name):
     check_day = 0
     for day in user.full_plan:
@@ -236,14 +246,37 @@ def is_recipe_in_day(user, day_date, recipe_name):
     return False
 
 
-# ---- get функции ----
+# ----- get функции -----
 
-
+# получить всю информацию о конкретном дне
 def get_day(user, day_date):
     for day in user.full_plan:
         if day.date == day_date:
             return day
     return 0
+
+
+# ------ функции для получения данных ------
+
+# получить перечень рецептов о конкретном дне
+# возвращает словарь (имя:описание рецепта)
+def give_single_day_recipes(u_id, date):
+    u = User.objects.get(user_id=u_id)
+    this_day = get_day(u, date)
+    return_res = {}
+    for rec in this_day.recipes:
+        return_res[rec.name] = rec.description
+    return return_res
+
+
+# получить перечень всех рецептов
+# возвращает словарь (дата:(словарь с описанием рецепта))
+def give_all_recipes(u_id):
+    res_dict = {}
+    u = User.objects.get(user_id=u_id)
+    for day in u.full_plan:
+        res_dict[day.date] = give_single_day_recipes(u_id, day.date)
+    return res_dict
 
 
 # функция вспомогательная, для отладки
@@ -259,7 +292,7 @@ def print_all_user_info(u_id):
         res_str += f'product - {a_pr.name},cou = {a_pr.quantity}'
     res_str += '; sep products:'
     for s_pr in u.separate_products:
-        res_str += f'sep product - {s_pr.name}, cou = {s_pr.quantity}
+        res_str += f'sep product - {s_pr.name}, cou = {s_pr.quantity}'
     print(res_str)
 
 
@@ -293,7 +326,6 @@ second_day.save()'''
 '''new_user = User(user_id=16, full_plan=[], availible_products=[tom, milk], separate_products=[tom1, milk1])
 new_user.save()
 
-print_all_user_info(16)
 tom2 = Product(name='tomato', quantity=3, unit='kg')
 tom2.save()
 prod1 = make_product('bread', 1, 'kg')
@@ -307,6 +339,5 @@ add_recipe_to_day(16, datetime.date.today(), recipe2)
 
 print_all_user_info(16)
 
-delete_all_user_info(16)
-
-print_all_user_info(16)'''
+all_recipes = give_all_recipes(16)
+print(all_recipes)'''
