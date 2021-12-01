@@ -11,6 +11,8 @@ date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')'''
 def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
     con = connect(base_name, host=base_host, port=base_port)
 
+con = connect('test_db_3', host='localhost', port=27017)
+
 
 class Product(Document):
     name = StringField()  # название продукта
@@ -25,7 +27,7 @@ class Recipe(Document):  # рецепт
 
 
 class Day_plan(Document):  # план по рецептам на день
-    date = DateField()  # дата
+    date = StringField()  # дата
     day = StringField()  # день недели
     recipes = ListField(ReferenceField(Recipe))  # перечень рецептов
 
@@ -33,16 +35,56 @@ class Day_plan(Document):  # план по рецептам на день
 class User(Document):  # общая информация о пользователе
     user_id = LongField()  # уникальный id пользователя
     full_plan = ListField(ReferenceField(Day_plan))  # план на неделю
-    availible_products = ListField(ReferenceField(Product))  # какие продукты есть
+    available_products = ListField(ReferenceField(Product))  # какие продукты есть
     separate_products = ListField(ReferenceField(Product))  # какие продукты купить
+    state = IntField()
+    n_days = IntField()
+    day = IntField()
 
 
 # создание нового пользователя при его первичном обращении к боту
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
+        u = User.objects.get(user_id=u_id)
+        u.modify(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
         return
-    user_new = User(user_id=u_id, full_plan=[], availible_products=[])
+    user_new = User(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
     user_new.save()
+
+
+def get_user_state(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.state
+
+
+def get_user_n_days(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.n_days
+
+
+def get_user_day(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.day
+
+
+def set_user_n_days(u_id, n_days):
+    u = User.objects.get(user_id=u_id)
+    u.modify(n_days=n_days)
+
+
+def set_user_state(u_id, state):
+    u = User.objects.get(user_id=u_id)
+    u.modify(state=state)
+
+
+def set_user_day(u_id, day):
+    u = User.objects.get(user_id=u_id)
+    return u.modify(day=day)
+
+
+def decrease_user_day(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.modify(day=u.day - 1)
 
 
 #  ------ блок с функциями удаления ------
@@ -65,9 +107,9 @@ def delete_user_plan(u_id):
 # очистить список продуктов в наличии полностью
 def delete_user_av_products(u_id):
     u = User.objects.get(user_id=u_id)
-    for prod in u.availible_products:
+    for prod in u.available_products:
         prod.delete()
-    User.objects(user_id=u_id).modify(availible_products=[])
+    User.objects(user_id=u_id).modify(available_products=[])
 
 
 #  очистить список независимых продуктов из корзины полностью
@@ -156,7 +198,7 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
             return
     new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
     new_product.save()
-    u.modify(push__availible_products=new_product)
+    u.modify(push__available_products=new_product)
 
 
 # пополнить список продуктов, которые нужно купить просто так
@@ -176,10 +218,10 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
 
 
 # добавляем новый день/ обновляем информацию о нем
-def add_new_day(u_id, day_date, day='Monday', *recipes):
+def add_new_day(u_id, day_date, day, *recipes):
     u = User.objects.get(user_id=u_id)
     new_day = is_exist_day(u, day_date)
-    if new_day == False:
+    if not new_day:
         new_day = Day_plan(date=day_date, day=day, recipes=recipes)
         new_day.save()
         u.modify(push__full_plan=new_day)
@@ -212,7 +254,7 @@ def add_recipe_to_day(u_id, day_date, recipe, *day):
 
 # проверка, есть ли уже продукт в перечне доступных продуктов
 def is_in_available_products(user, product_name):
-    for av_p in user.availible_products:
+    for av_p in user.available_products:
         if av_p.name == product_name:
             return av_p
     return False
@@ -276,10 +318,12 @@ def give_single_day_recipes(u_id, date):
 # возвращает словарь (дата:(словарь с описанием рецепта))
 def give_all_recipes(u_id):
     res_dict = {}
+    day_name = {}
     u = User.objects.get(user_id=u_id)
     for day in u.full_plan:
         res_dict[day.date] = give_single_day_recipes(u_id, day.date)
-    return res_dict
+        day_name[day.date] = day.day
+    return res_dict, day_name
 
 
 # получение всей продуктовой корзины
@@ -325,8 +369,8 @@ def print_all_user_info(u_id):
         res_str += f' date -{rec.date},'
         res_str += f'rec_count={len(rec.recipes)},'
         res_str += f'rec={rec.recipes}'
-    res_str += '; availible products:'
-    for a_pr in u.availible_products:
+    res_str += '; available products:'
+    for a_pr in u.available_products:
         res_str += f'product - {a_pr.name},cou = {a_pr.quantity}'
     res_str += '; sep products:'
     for s_pr in u.separate_products:
@@ -365,7 +409,7 @@ first_day.save()
 second_day = Day_plan(date=date_time_obj.date()+datetime.timedelta(days=1), day='Monday', recipes=[recipe_3, recipe_4])
 second_day.save()'''
 
-'''new_user = User(user_id=16, full_plan=[], availible_products=[tom, milk], separate_products=[tom1, milk1])
+'''new_user = User(user_id=16, full_plan=[], available_products=[tom, milk], separate_products=[tom1, milk1])
 new_user.save()
 
 tom2 = Product(name='tomato', quantity=3, unit='kg')
