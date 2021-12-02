@@ -72,7 +72,8 @@ def start_command(message):
     user_id = message.from_user.id
     make_new_user(user_id)
     print_all_user_info(user_id)
-    bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?", reply_markup=make_days_buttons())
+    bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?",
+                     reply_markup=make_days_buttons())
 
 
 @bot.message_handler(regexp=r'(^\d+$)')
@@ -151,10 +152,17 @@ def show_recipes_handler(message):
 @bot.message_handler(commands=['have'])
 def have_product_handler(message):
     user_id = message.from_user.id
-    print(message.json['reply_to_message']['text'])
-    print(message.text)
-    print(message.entities[0])
-
+    text = message.json['reply_to_message']['text']
+    if ':' not in text:
+        print(text.strip(), 0, 'none')
+        # добавялет в имеющиеса продукт
+    else:
+        product = text.split(':')
+        product_name = product[0]
+        [quantity, units] = product[1].strip().split(' ')
+        print(product_name, quantity, units)
+        available_quantity = message.text[message.entities[0].length:].strip()
+        print(available_quantity)
 
 
 def unification(units):
