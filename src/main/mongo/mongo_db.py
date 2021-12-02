@@ -171,7 +171,7 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_available_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            if modify_prod.has_null_parts and modify_prod.unit == 'None':
+            if modify_prod.has_null_parts and modify_prod.unit == 'none':
                 modify_prod.modify(quantity=p_qua, unit=p_unit)
                 return
             if not modify_prod.has_null_parts and p_unit == 'none':
