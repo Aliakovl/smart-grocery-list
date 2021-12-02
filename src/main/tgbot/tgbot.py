@@ -154,15 +154,13 @@ def have_product_handler(message):
     user_id = message.from_user.id
     text = message.json['reply_to_message']['text']
     if ':' not in text:
-        print(text.strip(), 0, 'none')
-        # добавялет в имеющиеса продукт
+        add_to_available_products(text.strip(), 0, 'none')
     else:
         product = text.split(':')
         product_name = product[0]
         [quantity, units] = product[1].strip().split(' ')
-        print(product_name, quantity, units)
         available_quantity = message.text[message.entities[0].length:].strip()
-        print(available_quantity)
+        add_to_available_products(product_name, available_quantity, units)
 
 
 def unification(units):
