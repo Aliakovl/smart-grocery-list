@@ -11,7 +11,6 @@ date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')'''
 def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
     con = connect(base_name, host=base_host, port=base_port)
 
-con = connect('test_db_3', host='localhost', port=27017)
 
 
 class Product(Document):
@@ -46,9 +45,10 @@ class User(Document):  # общая информация о пользовате
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
         u = User.objects.get(user_id=u_id)
-        u.modify(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
+        u.modify(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
+        # delete_all_user_info(u_id)
         return
-    user_new = User(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
+    user_new = User(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
     user_new.save()
 
 

@@ -6,14 +6,68 @@ from src.main.model.model import *
 from datetime import date
 from src.main.mongo.mongo_db import *
 from src.main.model.recipe_parser import ParserRecipe
+from src.main.model.typos_search import *
+
 
 TOKEN = getenv('TELEGRAM_TOKEN')
 bot = TeleBot(token=TOKEN)
 day_name = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-pieces = ['штуки', 'штука', 'штук']
+pieces = ['шт', 'штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
+milliliters = ['мл', 'миллилитр', 'миллилитра', 'миллилитров']
 
+connect_to_base()
+
+tea_spoon = ['чайная ложка', 'ч. ложка', 'чайн. ложка', 'чайная л', 'ч. ложек']
+table_spoon = ['столовая ложка', 'ст. ложка', 'стол. ложка', 'столовая л', 'cт. ложек']
+glass = ['стакан', 'стак', 'ст']
+
+dict_for_glass = {
+    'сахар': '200',
+    'крахмал': '160',
+    'мука': '160',
+    'молоко': '250',
+    'мед': '415',
+    'масло': '225',
+    'вода': '200',
+    'сливки': '230',
+    'сметана': '230',
+    'рис': '180',
+    'гречка': '165',
+    'манка': '160'
+}
+dict_for_tablespoon = {
+    'сахар': '25',
+    'крахмал': '12',
+    'мука': '25',
+    'молоко': '20',
+    'мед': '30',
+    'масло': '17',
+    'желатин': '10',
+    'сода': '8.5',
+    'томатная паста': '24',
+    'соль': '30'
+
+}
+dict_for_teaspoon = {
+    'сахар': '8',
+    'крахмал': '6',
+    'мука': '8',
+    'молоко': '5',
+    'мед': '9',
+    'масло': '5',
+    'соль': '10'
+}
+dict_of_products = {
+    'стакан': dict_for_glass,
+    'столовая ложка': dict_for_tablespoon,
+    'чайная ложка': dict_for_teaspoon
+}
+liquid = ['молоко', 'растительное масло', 'вода', 'сливки', 'кефир', 'коньяк', 'вино', 'уксус']
+
+
+connect_to_base()
 
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
@@ -52,12 +106,19 @@ def add_product_button():
     makeup = types.ReplyKeyboardMarkup(True, False)
     generate_list = types.KeyboardButton("/generate_list")
     show_recipes = types.KeyboardButton("/show_recipes")
-    add_available_products = types.KeyboardButton("/i_have_some")
-    add_separate_product = types.KeyboardButton("/add_separate")
-    makeup.row(generate_list)
-    makeup.row(show_recipes)
-    makeup.row(add_available_products)
-    makeup.row(add_separate_product)
+    add_separate_products = types.KeyboardButton("/add_separate")
+    makeup.row(generate_list,
+               show_recipes,
+               add_separate_products)
+    return makeup
+
+
+def inside_add_product():
+    makeup = types.ReplyKeyboardMarkup(True, False)
+    add_separate_products = types.KeyboardButton("/add_separate")
+    end_adding = types.KeyboardButton("/end_add")
+    makeup.row(add_separate_products,
+               end_adding)
     return makeup
 
 
@@ -82,9 +143,18 @@ def i_have_some_handler(message):
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user_id = message.from_user.id
+    print(user_id)
     make_new_user(user_id)
     print_all_user_info(user_id)
     bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?", reply_markup=make_days_buttons())
+
+
+@bot.message_handler(commands=['add_separate'])
+def separate_product_handler(message):
+    print(message.text)
+    user_id = message.from_user.id
+    bot.send_message(message.from_user.id, "Чтобы добавить продукт в список\nотправьте сообщение в формате:\nпродукт кол-во ед.изм.")
+    set_user_state(user_id, 4)
 
 
 @bot.message_handler(regexp=r'(^\d+$)')
@@ -100,7 +170,8 @@ def number_handler(message):
         print(my_date)
         day_nm = day_name[my_date.weekday()]
         print(my_date.weekday())
-        bot.send_message(message.from_user.id, f"Добавте ссылки на рецепты {day_nm}", reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты в {day_nm}\n",
+                         reply_markup=next_day_button())
 
 
 @bot.message_handler(commands=['next_day'])
@@ -119,7 +190,7 @@ def next_day_handler(message):
             decrease_user_day(user_id)
         else:
             set_user_state(user_id, 3)
-            bot.send_message(message.from_user.id, f"Что ещё добавить в список покупок?",
+            bot.send_message(message.from_user.id, f"Отлично, план составлен!\nДобавить еще продуктов?",
                              reply_markup=add_product_button())
 
 
@@ -202,15 +273,36 @@ def link_handler(message):
             add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, products))
 
 
+@bot.message_handler(commands=['end_add'])
+def end_handler(message):
+    print(message.text)
+    user_id = message.from_user.id
+    set_user_state(user_id, 3)
+    bot.send_message(user_id, "Список обновлен!", reply_markup=add_product_button())
+
 
 @bot.message_handler(regexp=r'(.*)')
-def start_command(message):
-    bot.send_message(message.chat.id, "Я не понимаю :(")
-    print(bot.get_me())
+def other_handler(message):
+    print(message.text)
+    user_id = message.from_user.id
+    if get_user_state(user_id) == 4:
+        try:
+            p_name, p_qua, p_unit = message.text.split(' ')
+        except Exception as e:
+            bot.send_message(message.chat.id, "Я не понимаю :(")
+            print(bot.get_me())
+        print("a")
+        add_to_separate_products(user_id, p_name, p_qua, p_unit)
+        set_user_state(user_id, 3)
+        bot.send_message(user_id, f"""Добавил {p_name} в список!
+Можешь добавить еще продуктов.
+Если закончил - отправь /end_add""", reply_markup=inside_add_product())
+    
+
 
 
 @bot.message_handler(content_types=['photo'])
-def start_command(message):
+def photo_handler(message):
     file_id = message.json['photo'][-1]['file_id']
     print(bot.get_file(file_id))
     print(bot.get_file_url(file_id))
