@@ -1,7 +1,7 @@
 from mongoengine import *
 
 
-# подключение к базу, по default указать имя и адрес нашей базы, где все вертится
+# подключение к базе, по default указать имя и адрес нашей базы, где все вертится
 def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
     con = connect(base_name, host=base_host, port=base_port)
 
@@ -10,6 +10,7 @@ class Product(Document):
     name = StringField()  # название продукта
     quantity = DecimalField()  # его количество
     unit = StringField()  # единица измерения
+    has_null_parts = BooleanField()  # сохраняем, встречались ли нам "нулевые" единицы измерения
 
 
 class Recipe(Document):  # рецепт
@@ -116,7 +117,7 @@ def delete_recipe(u_id, day_date, recipe_name):
     rec_del.delete()
 
 
-#  удалить/уменьшить наличие продукт из списка независимых продуктов в корзине
+#  удалить/уменьшить наличие продукта из списка независимых продуктов в корзине
 def delete_sep_product(u_id, product_name, delete_product=True, dec_value=0, dec_unit=''):
     u = User.objects.get(user_id=u_id)
     for prod in u.separate_products:
@@ -156,7 +157,10 @@ def delete_available_product(u_id, product_name, delete_product=True, dec_value=
 
 # создание продукта (вспомогательная функция для создания рецепта)
 def make_product(product_name, product_quantity, product_unit):
-    new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit)
+    is_none = False
+    if product_unit == 'none':
+        is_none = True
+    new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit, has_null_parts=is_none)
     new_product.save()
     return new_product
 
@@ -167,6 +171,11 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_available_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
+            if modify_prod.has_null_parts and modify_prod.unit == 'None':
+                modify_prod.modify(quantity=p_qua, unit=p_unit)
+                return
+            if not modify_prod.has_null_parts and p_unit == 'none':
+                modify_prod.modify(has_null_parts=True)
             print("O-o-ops, закралась другая единица измерения")
         else:
             # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
@@ -175,7 +184,7 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
                 return
             modify_prod.modify(inc__quantity=p_qua)
             return
-    new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
+    new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
     new_product.save()
     u.modify(push__available_products=new_product)
 
@@ -186,6 +195,11 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_separate_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
+            if modify_prod.has_null_parts and modify_prod.unit == 'none':
+                modify_prod.modify(quantity=p_qua, unit=p_unit)
+                return
+            if not modify_prod.has_null_parts and p_unit == 'none':
+                modify_prod.modify(has_null_parts=True)
             print("O-o-ops, закралась другая единица измерения")
         else:  # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
             if modify_prod.quantity + p_qua <= 0:
@@ -196,7 +210,7 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     if p_qua < 0:
         print("Alert: пользователь ввел отрицательное количество продукта")
         return
-    new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
+    new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
     new_product.save()
     u.modify(push__separate_products=new_product)
 
@@ -353,8 +367,7 @@ def give_all_recipes(u_id):
 
 
 # получение всей продуктовой корзины
-# возвращает словарь продукт:([количество, единица измерения])
-# TODO: могут быть проблемы с единициами измерения
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
 def give_grocery_list(u_id):
     dict_grocery = {}
     u = User.objects.get(user_id=u_id)
@@ -363,21 +376,34 @@ def give_grocery_list(u_id):
             for prod in rec.products:
                 if prod.name in dict_grocery:
                     el = dict_grocery[prod.name]
-                    el[0] += prod.quantity*rec.portion_count
+                    if prod.unit != 'none':
+                        el[0] += prod.quantity*rec.portion_count
+                    el[2] = el[2] or prod.has_null_parts
                     dict_grocery[prod.name] = el
                 else:
-                    dict_grocery[prod.name] = [prod.quantity*rec.portion_count, prod.unit]
+                    if prod.unit == 'none':
+                        qua = 0
+                    else:
+                        qua = prod.quantity * rec.portion_count
+                    dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
     for cep_prod in u.separate_products:
         if cep_prod.name in dict_grocery:
             el = dict_grocery[cep_prod.name]
-            el[0] += cep_prod.quantity
+            if cep_prod.unit != 'none':
+                el[0] += cep_prod.quantity
+            el[2] = el[2] or cep_prod.has_null_parts
             dict_grocery[cep_prod.name] = el
         else:
-            dict_grocery[cep_prod.name] = [cep_prod.quantity, cep_prod.unit]
+            if cep_prod.unit == 'none':
+                qua = 0
+            else:
+                qua = cep_prod.quantity
+            dict_grocery[cep_prod.name] = [qua, cep_prod.unit, cep_prod.has_null_parts]
     for av_prod in u.available_products:
+        if av_prod.unit == 'none':
+            continue
         if av_prod.name in dict_grocery:
             el = dict_grocery[av_prod.name]
-            print(el[0])
             el[0] -= av_prod.quantity
             if el[0] <= 0:
                 dict_grocery.pop(av_prod.name)
@@ -409,23 +435,23 @@ def print_all_user_info(u_id):
 '''
 connect_to_base()
 User.objects(user_id=16).delete()
-tom = Product(name='tomato', quantity=3, unit='kg')
+tom = make_product('tomato', 3, 'kg')
 tom.save()
-milk = Product(name='milk', quantity=1, unit='l')
+milk = make_product('milk', 1, 'l')
 milk.save()
-tom1 = Product(name='tomato', quantity=3, unit='kg')
+tom1 = make_product('tomato', 3, 'kg')
 tom1.save()
-milk1 = Product(name='milk', quantity=1, unit='l')
+milk1 = make_product('milk', 1, 'l')
 milk1.save()
 
 new_user = User(user_id=16, full_plan=[], available_products=[tom, milk], separate_products=[tom1, milk1])
 new_user.save()
 
-tom2 = Product(name='tomato', quantity=3, unit='kg')
+tom2 = make_product('tomato', 3, 'kg')
 tom2.save()
 prod1 = make_product('bread', 1, 'kg')
 prod2 = make_product('sugar', 0.6, 'kg')
-prod3 = make_product('sugar', 0.6, 'kg')
+prod3 = make_product('sugar', 0.6, 'none')
 add_new_day(16, '2021-05-19', 'Monday')
 recipe1 = make_new_recipe('buter', 'vkusno', 2, [prod1, prod2])
 recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', 3, [prod3, tom2])
