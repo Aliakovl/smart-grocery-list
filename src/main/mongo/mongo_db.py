@@ -6,6 +6,7 @@ def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=2701
     con = connect(base_name, host=base_host, port=base_port)
 
 
+
 class Product(Document):
     name = StringField()  # название продукта
     quantity = DecimalField()  # его количество
@@ -39,8 +40,11 @@ class User(Document):  # общая информация о пользовате
 # создание нового пользователя при его первичном обращении к боту
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
+        u = User.objects.get(user_id=u_id)
+        u.modify(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
+        # delete_all_user_info(u_id)
         return
-    user_new = User(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
+    user_new = User(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
     user_new.save()
 
 
@@ -171,7 +175,7 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_available_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            if modify_prod.has_null_parts and modify_prod.unit == 'None':
+            if modify_prod.has_null_parts and modify_prod.unit == 'none':
                 modify_prod.modify(quantity=p_qua, unit=p_unit)
                 return
             if not modify_prod.has_null_parts and p_unit == 'none':
