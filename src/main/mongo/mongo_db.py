@@ -348,7 +348,7 @@ def give_grocery_list(u_id):
             dict_grocery[cep_prod.name] = el
         else:
             dict_grocery[cep_prod.name] = [cep_prod.quantity, cep_prod.unit]
-    for av_prod in u.availible_products:
+    for av_prod in u.available_products:
         if av_prod.name in dict_grocery:
             el = dict_grocery[av_prod.name]
             print(el[0])

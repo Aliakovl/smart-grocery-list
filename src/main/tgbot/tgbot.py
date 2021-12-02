@@ -4,14 +4,15 @@ from telebot import types, TeleBot
 from os import getenv
 from src.main.model.model import *
 from datetime import date
-# import calendar
 from src.main.mongo.mongo_db import *
 from src.main.model.recipe_parser import ParserRecipe
 
 TOKEN = getenv('TELEGRAM_TOKEN')
 bot = TeleBot(token=TOKEN)
 day_name = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-
+pieces = ['штуки', 'штука', 'штук']
+grams = ['г', 'гр', 'грамм', 'грамма']
+kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
@@ -50,12 +51,19 @@ def add_product_button():
     makeup = types.ReplyKeyboardMarkup(True, False)
     generate_list = types.KeyboardButton("/generate_list")
     show_recipes = types.KeyboardButton("/show_recipes")
+    add_available_products = types.KeyboardButton("/i_have_some")
     makeup.row(generate_list)
     makeup.row(show_recipes)
+    makeup.row(add_available_products)
     return makeup
 
 
 make_init_buttons()
+
+
+@bot.message_handler(commands=['i_have_some'])
+def i_have_some_handler(message):
+    user_id = message.from_user.id
 
 
 @bot.message_handler(commands=['start'])
@@ -107,8 +115,18 @@ def generate_list_handler(message):
     user_id = message.from_user.id
     print(message)
     if get_user_state(user_id) == 3:
-        set_user_state(user_id, 4)
-        bot.send_message(message.from_user.id, "Cписок покупок")
+        print(give_grocery_list(user_id))
+        grocery_list = give_grocery_list(user_id)
+        for product, pair in grocery_list.items():
+            quantity, units = pair[0], pair[1]
+            print(quantity)
+            if quantity >= 1000:
+                quantity /= 1000
+                units = kilograms[0]
+            if units == 'none':
+                bot.send_message(message.from_user.id, f'{product}')
+            else:
+                bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
 
 
 @bot.message_handler(commands=['show_recipes'])
@@ -116,7 +134,6 @@ def show_recipes_handler(message):
     user_id = message.from_user.id
     print(message)
     if get_user_state(user_id) == 3:
-        set_user_state(user_id, 4)
         recipes, days = give_all_recipes(user_id)
         for day, day_n in days.items():
             keyboard = types.InlineKeyboardMarkup(row_width=len(days))
@@ -125,9 +142,31 @@ def show_recipes_handler(message):
             bot.send_message(message.from_user.id, f'{day_n}:   {day}', reply_markup=keyboard)
 
 
+def unification(units):
+    units = units.strip().lower()
+    for piece in pieces:
+        if piece in units:
+            return pieces[0]
+    if units == kilograms[0]:
+        return kilograms[0]
+    for kilogram in kilograms[1:]:
+        if kilogram in units:
+            return kilograms[0]
+    if units == grams[0] or units == grams[1]:
+        return grams[0]
+    for gram in grams[2:]:
+        if gram in units:
+            return grams[0]
+    return 'none'
+
+
 @bot.message_handler(func=lambda message: 'entities' in message.json and message.json['entities'][0]['type'] == 'url')
 def link_handler(message):
     print(message.text)
+    begin = message.json['entities'][0]['offset']
+    end = begin + message.json['entities'][0]['length']
+    url = message.text[begin:end]
+    print(url)
     user_id = message.from_user.id
     if get_user_state(user_id) == 2:
         if get_user_day(user_id) >= 0:
@@ -136,17 +175,23 @@ def link_handler(message):
             print(next_day)
             print(next_day.weekday())
             day_nm = day_name[next_day.weekday()]
-            parser = ParserRecipe(message.text)
+            parser = ParserRecipe(url)
             ingredients = parser.pipe()
-            products = [make_product(*ingredient) for ingredient in ingredients]
-            description = message.text
+            products = []
+            for name, quantity, units in ingredients:
+                u_units = unification(units)
+                if u_units == kilograms[0]:
+                    quantity *= 1000
+                    u_units = grams[0]
+                products.append(make_product(name, quantity, u_units))
+            description = url
             name = parser.get_name()
             add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, products))
 
 
 @bot.message_handler(regexp=r'(.*)')
 def start_command(message):
-    bot.send_message(message.chat.id, "Hello!")
+    bot.send_message(message.chat.id, "Я не понимаю :(")
     print(bot.get_me())
 
 

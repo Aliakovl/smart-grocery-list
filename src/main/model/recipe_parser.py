@@ -8,6 +8,12 @@ class ParserRecipe:
         self.url = url
 
     def parse(self):
+
+        if self.url.startswith('https://m.povar.ru'):
+            self.url = 'https://povar.ru' + self.url[18:]
+
+        print(self.url)
+
         page = requests.get(self.url)
 
         # get page of the user's recepy
@@ -58,34 +64,16 @@ class ParserRecipe:
         return ingrs, ingrs_size
 
     def pipe(self):
-        def arr_of_tuples_of_ingrs(nums, ingrs_size):
-            new_list = []
-            for i in nums:
-                new_num = ''
-                if len(i) > 0:
-                    if len(i) == 1 and i[0] == ',':
-                        continue
-                    for j in i:
-                        new_num += j
-                else:
-                    continue
-                new_list.append(new_num)
-
-            for i in range(len(new_list)):
-                ingrs_size[i] = ingrs_size[i].replace(new_list[i], '')
-                new_list[i] = float(new_list[i].replace(',', '.'))
-
-            return list(zip(ingrs, new_list, ingrs_size))
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
-        print(ingrs)
-        legal_chars = r'[0-9_,]'
+        reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
         nums = []
-        for i in ingrs_size:
-            n = [re.findall(legal_chars, x) for x in i.split()]
-            nums.append(n[0])
-        arr_of_tuples = arr_of_tuples_of_ingrs(nums, ingrs_size)
-        return arr_of_tuples
+        for a in ingrs_size:
+            line = re.sub(reg, r'\1', a, flags=re.X)
+            ns = [float(j) for j in line.split('-')]
+            av = sum(ns) / len(ns)
+            nums.append(av)
+        return list(zip(ingrs, nums, ingrs_size))
 
     def get_name(self):
         return self.name
