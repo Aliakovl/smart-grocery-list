@@ -13,6 +13,8 @@ pieces = ['штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 
+connect_to_base()
+
 
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
@@ -87,8 +89,8 @@ def number_handler(message):
         print(my_date)
         day_nm = day_name[my_date.weekday()]
         print(my_date.weekday())
-        bot.send_message(message.from_user.id, f'Искать рецепты здесь: https://povar.ru')
-        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}", reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f'Искать рецепты здесь: https://povar.ru', reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}")
 
 
 @bot.message_handler(commands=['next_day'])
@@ -207,7 +209,7 @@ def link_handler(message):
                 products.append(make_product(name, quantity, u_units))
             description = url
             name = parser.get_name()
-            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, products))
+            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, 1, products))
 
 
 @bot.message_handler(regexp=r'(.*)')
