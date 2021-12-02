@@ -2,7 +2,6 @@ import datetime
 
 from telebot import types, TeleBot
 from os import getenv
-from src.main.model.model import *
 from datetime import date
 from src.main.mongo.mongo_db import *
 from src.main.model.recipe_parser import ParserRecipe
@@ -154,13 +153,13 @@ def have_product_handler(message):
     user_id = message.from_user.id
     text = message.json['reply_to_message']['text']
     if ':' not in text:
-        add_to_available_products(text.strip(), 0, 'none')
+        add_to_available_products(user_id, text.strip(), 0, 'none')
     else:
         product = text.split(':')
         product_name = product[0]
         [quantity, units] = product[1].strip().split(' ')
         available_quantity = message.text[message.entities[0].length:].strip()
-        add_to_available_products(product_name, available_quantity, units)
+        add_to_available_products(user_id, product_name, available_quantity, units)
 
 
 def unification(units):
