@@ -1,29 +1,22 @@
 from mongoengine import *
 
-# TODO: delete this
-'''import datetime
 
-date_time_str = 'Jun 28 2018 7:40AM'
-date_time_obj = datetime.datetime.strptime(date_time_str, '%b %d %Y %I:%M%p')'''
-
-
-# подключение к базу, по default указать имя и адрес нашей базы, где все вертится
+# подключение к базе, по default указать имя и адрес нашей базы, где все вертится
 def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
     con = connect(base_name, host=base_host, port=base_port)
-
-
-con = connect('test_db_3', host='localhost', port=27017)
 
 
 class Product(Document):
     name = StringField()  # название продукта
     quantity = DecimalField()  # его количество
     unit = StringField()  # единица измерения
+    has_null_parts = BooleanField()  # сохраняем, встречались ли нам "нулевые" единицы измерения
 
 
 class Recipe(Document):  # рецепт
     name = StringField()  # название рецепта
     description = StringField()  # его описание / ссылка на рецепт
+    portion_count = DecimalField()
     products = ListField(ReferenceField(Product))  # перечень необходимых продуктов и их количество
 
 
@@ -38,54 +31,17 @@ class User(Document):  # общая информация о пользовате
     full_plan = ListField(ReferenceField(Day_plan))  # план на неделю
     available_products = ListField(ReferenceField(Product))  # какие продукты есть
     separate_products = ListField(ReferenceField(Product))  # какие продукты купить
-    state = IntField()
-    n_days = IntField()
-    day = IntField()
+    state = IntField()  # вспомогательное поле
+    n_days = IntField()  # количество дней, для которых составлен роцион пользователя
+    day = IntField()  # текущий день
 
 
 # создание нового пользователя при его первичном обращении к боту
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
-        u = User.objects.get(user_id=u_id)
-        u.modify(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
         return
     user_new = User(user_id=u_id, full_plan=[], available_products=[], state=1, n_days=0, day=0)
     user_new.save()
-
-
-def get_user_state(u_id):
-    u = User.objects.get(user_id=u_id)
-    return u.state
-
-
-def get_user_n_days(u_id):
-    u = User.objects.get(user_id=u_id)
-    return u.n_days
-
-
-def get_user_day(u_id):
-    u = User.objects.get(user_id=u_id)
-    return u.day
-
-
-def set_user_n_days(u_id, n_days):
-    u = User.objects.get(user_id=u_id)
-    u.modify(n_days=n_days)
-
-
-def set_user_state(u_id, state):
-    u = User.objects.get(user_id=u_id)
-    u.modify(state=state)
-
-
-def set_user_day(u_id, day):
-    u = User.objects.get(user_id=u_id)
-    return u.modify(day=day)
-
-
-def decrease_user_day(u_id):
-    u = User.objects.get(user_id=u_id)
-    return u.modify(day=u.day - 1)
 
 
 #  ------ блок с функциями удаления ------
@@ -161,8 +117,8 @@ def delete_recipe(u_id, day_date, recipe_name):
     rec_del.delete()
 
 
-#  удалить независимый продукт из корзины
-def delete_sep_product(u_id, product_name):
+#  удалить/уменьшить наличие продукта из списка независимых продуктов в корзине
+def delete_sep_product(u_id, product_name, delete_product=True, dec_value=0, dec_unit=''):
     u = User.objects.get(user_id=u_id)
     for prod in u.separate_products:
         if prod.name == product_name:
@@ -171,16 +127,40 @@ def delete_sep_product(u_id, product_name):
         print("no such separate product")
         return
     u_sep = u.separate_products
-    u_sep.remove(del_prod)
-    u.modify(separate_products=u_sep)
-    del_prod.delete()
+    if delete_product:
+        u_sep.remove(del_prod)
+        u.modify(separate_products=u_sep)
+        del_prod.delete()
+    else:
+        add_to_separate_products(u_id, product_name, -dec_value, dec_unit)
+
+
+#  удалить/ уменьшить наличие продукт из списка в "холодильнике"
+def delete_available_product(u_id, product_name, delete_product=True, dec_value=0, dec_unit=''):
+    u = User.objects.get(user_id=u_id)
+    for prod in u.savailable_products:
+        if prod.name == product_name:
+            del_prod = prod
+            break
+        print("no such separate product")
+        return
+    u_sep = u.available_products
+    if delete_product:
+        u_sep.remove(del_prod)
+        u.modify(available_products=u_sep)
+        del_prod.delete()
+    else:
+        add_to_available_products(u_id, product_name, -dec_value, dec_unit)
 
 
 #  ----- блок с функциями добавления -----
 
 # создание продукта (вспомогательная функция для создания рецепта)
 def make_product(product_name, product_quantity, product_unit):
-    new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit)
+    is_none = False
+    if product_unit == 'none':
+        is_none = True
+    new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit, has_null_parts=is_none)
     new_product.save()
     return new_product
 
@@ -191,13 +171,20 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_available_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            # TODO: перевод единиц измерения
-            pass
+            if modify_prod.has_null_parts and modify_prod.unit == 'None':
+                modify_prod.modify(quantity=p_qua, unit=p_unit)
+                return
+            if not modify_prod.has_null_parts and p_unit == 'none':
+                modify_prod.modify(has_null_parts=True)
+            print("O-o-ops, закралась другая единица измерения")
         else:
             # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
+            if modify_prod.quantity + p_qua <= 0:
+                delete_available_product(u_id, p_name)
+                return
             modify_prod.modify(inc__quantity=p_qua)
             return
-    new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
+    new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
     new_product.save()
     u.modify(push__available_products=new_product)
 
@@ -208,12 +195,22 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     modify_prod = is_in_separate_products(u, p_name)
     if modify_prod:
         if modify_prod.unit != p_unit:
-            # TODO: перевод единиц измерения
-            pass
+            if modify_prod.has_null_parts and modify_prod.unit == 'none':
+                modify_prod.modify(quantity=p_qua, unit=p_unit)
+                return
+            if not modify_prod.has_null_parts and p_unit == 'none':
+                modify_prod.modify(has_null_parts=True)
+            print("O-o-ops, закралась другая единица измерения")
         else:  # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
+            if modify_prod.quantity + p_qua <= 0:
+                delete_sep_product(u_id, p_name)
+                return
             modify_prod.modify(inc__quantity=p_qua)
             return
-    new_product = Product(name=p_name, quantity=p_qua, unit=p_unit)  # если нет в корзине -- добавляем в корзину
+    if p_qua < 0:
+        print("Alert: пользователь ввел отрицательное количество продукта")
+        return
+    new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
     new_product.save()
     u.modify(push__separate_products=new_product)
 
@@ -236,18 +233,42 @@ def add_new_day(u_id, day_date, day, *recipes):
 
 
 # создание нового рецепта (вспомогательная функция, нужна для добавления рецепта в конкретный день)
-def make_new_recipe(recipe_name, recipe_description='', *products):
+def make_new_recipe(recipe_name, recipe_description='', recipe_count=1,  *products):
     if isinstance(products[0], list):
-        new_recipe = Recipe(name=recipe_name, description=recipe_description, products=products[0])
+        new_recipe = Recipe(name=recipe_name, description=recipe_description, portion_count=recipe_count, products=products[0])
     else:
-        new_recipe = Recipe(name=recipe_name, description=recipe_description, products=products)
+        new_recipe = Recipe(name=recipe_name, description=recipe_description, portion_count=recipe_count, products=products)
     new_recipe.save()
     return new_recipe
 
 
 # добавление нового рецепта в план
-def add_recipe_to_day(u_id, day_date, recipe, *day):
+def add_recipe_to_day(u_id, day_date, recipe, day):
     add_new_day(u_id, day_date, day, recipe)
+
+
+# изменение количество дней, для которых пишем рацион
+def set_user_n_days(u_id, n_days):
+    u = User.objects.get(user_id=u_id)
+    u.modify(n_days=n_days)
+
+
+# изменение статуса пользователя
+def set_user_state(u_id, state):
+    u = User.objects.get(user_id=u_id)
+    u.modify(state=state)
+
+
+# изменить текущий(заполняемый) день
+def set_user_day(u_id, day):
+    u = User.objects.get(user_id=u_id)
+    return u.modify(day=day)
+
+
+# установить текущим днем предыдущий
+def decrease_user_day(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.modify(day=u.day - 1)
 
 
 # ----- блок с функциями проверки "is in" ------
@@ -302,6 +323,32 @@ def get_day(user, day_date):
     return 0
 
 
+def get_recipe(user, day_date, recipe_name):
+    day = get_day(user, day_date)
+    for rec in day.recipes:
+        if rec.name == recipe_name:
+            return rec
+    return 0
+
+
+# получение state пользователя
+def get_user_state(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.state
+
+
+# получение количества дней, для которых составляется/составлен рацион
+def get_user_n_days(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.n_days
+
+
+# получить текущий день, по которому выполняется заполнение информации
+def get_user_day(u_id):
+    u = User.objects.get(user_id=u_id)
+    return u.day
+
+
 # ------ функции для получения данных ------
 
 # получить перечень рецептов о конкретном дне
@@ -316,7 +363,7 @@ def give_single_day_recipes(u_id, date):
 
 
 # получить перечень всех рецептов
-# возвращает словарь (дата:(словарь с описанием рецепта))
+# возвращает словарь (дата:(словарь с описанием рецептов))
 def give_all_recipes(u_id):
     res_dict = {}
     day_name = {}
@@ -328,8 +375,7 @@ def give_all_recipes(u_id):
 
 
 # получение всей продуктовой корзины
-# возвращает словарь продукт:([количество, единица измерения])
-# TODO: могут быть проблемы с единициами измерения
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
 def give_grocery_list(u_id):
     dict_grocery = {}
     u = User.objects.get(user_id=u_id)
@@ -338,26 +384,124 @@ def give_grocery_list(u_id):
             for prod in rec.products:
                 if prod.name in dict_grocery:
                     el = dict_grocery[prod.name]
-                    el[0] += prod.quantity
+                    if prod.unit != 'none':
+                        el[0] += prod.quantity*rec.portion_count
+                    el[2] = el[2] or prod.has_null_parts
                     dict_grocery[prod.name] = el
                 else:
-                    dict_grocery[prod.name] = [prod.quantity, prod.unit]
+                    if prod.unit == 'none':
+                        qua = 0
+                    else:
+                        qua = prod.quantity * rec.portion_count
+                    dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
     for cep_prod in u.separate_products:
         if cep_prod.name in dict_grocery:
             el = dict_grocery[cep_prod.name]
-            el[0] += cep_prod.quantity
+            if cep_prod.unit != 'none':
+                el[0] += cep_prod.quantity
+            el[2] = el[2] or cep_prod.has_null_parts
             dict_grocery[cep_prod.name] = el
         else:
-            dict_grocery[cep_prod.name] = [cep_prod.quantity, cep_prod.unit]
+            if cep_prod.unit == 'none':
+                qua = 0
+            else:
+                qua = cep_prod.quantity
+            dict_grocery[cep_prod.name] = [qua, cep_prod.unit, cep_prod.has_null_parts]
     for av_prod in u.available_products:
+        if av_prod.unit == 'none':
+            continue
         if av_prod.name in dict_grocery:
             el = dict_grocery[av_prod.name]
-            print(el[0])
             el[0] -= av_prod.quantity
-            if el[0] <= 0:
+            if el[0] <= 0 and not av_prod.has_null_parts:
                 dict_grocery.pop(av_prod.name)
+            elif el[0] <= 0 and av_prod.has_null_parts:
+                el[0] = 0
+                el[2] = True
+                dict_grocery[av_prod.name] = el
             else:
                 dict_grocery[av_prod.name] = el
+    return dict_grocery
+
+
+# получение всей продуктовой корзины для конкретного дня !!!!с учетом доступных продуктов
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
+def give_grocery_list_for_day(u_id, day_date):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    day_plan = get_day(u, day_date)
+    for rec in day_plan.recipes:
+        for prod in rec.products:
+            if prod.name in dict_grocery:
+                el = dict_grocery[prod.name]
+                if prod.unit != 'none':
+                    el[0] += prod.quantity*rec.portion_count
+                el[2] = el[2] or prod.has_null_parts
+                dict_grocery[prod.name] = el
+            else:
+                if prod.unit == 'none':
+                    qua = 0
+                else:
+                    qua = prod.quantity * rec.portion_count
+                dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
+    for av_prod in u.available_products:
+        if av_prod.unit == 'none':
+            continue
+        if av_prod.name in dict_grocery:
+            el = dict_grocery[av_prod.name]
+            el[0] -= av_prod.quantity
+            if el[0] <= 0 and not av_prod.has_null_parts:
+                dict_grocery.pop(av_prod.name)
+            elif el[0] <= 0 and av_prod.has_null_parts:
+                el[0] = 0
+                el[2] = True
+                dict_grocery[av_prod.name] = el
+            else:
+                dict_grocery[av_prod.name] = el
+    return dict_grocery
+
+
+# получение всей продуктовой корзины для конкретного дня !!!! без учета доступных продуктов
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
+def give_grocery_list_for_clear_day(u_id, day_date):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    day_plan = get_day(u, day_date)
+    for rec in day_plan.recipes:
+        for prod in rec.products:
+            if prod.name in dict_grocery:
+                el = dict_grocery[prod.name]
+                if prod.unit != 'none':
+                    el[0] += prod.quantity*rec.portion_count
+                el[2] = el[2] or prod.has_null_parts
+                dict_grocery[prod.name] = el
+            else:
+                if prod.unit == 'none':
+                    qua = 0
+                else:
+                    qua = prod.quantity * rec.portion_count
+                dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
+    return dict_grocery
+
+
+# получение всей продуктовой корзины для рецепта
+def give_grocery_list_for_recipe(u_id, day_date, recipe_name):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    recipe = get_recipe(u, day_date, recipe_name)
+    for prod in recipe.products:
+        if prod.name in dict_grocery:
+            el = dict_grocery[prod.name]
+            if prod.unit != 'none':
+                el[0] += prod.quantity*recipe.portion_count
+            el[2] = el[2] or prod.has_null_parts
+            dict_grocery[prod.name] = el
+        else:
+            if prod.unit == 'none':
+                qua = 0
+            else:
+                qua = prod.quantity * recipe.portion_count
+            dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
     return dict_grocery
 
 
@@ -384,50 +528,36 @@ def print_all_user_info(u_id):
 '''
 connect_to_base()
 User.objects(user_id=16).delete()
-tom = Product(name='tomato', quantity=3, unit='kg')
+tom = make_product('tomato', 3, 'kg')
 tom.save()
-milk = Product(name='milk', quantity=1, unit='l')
+milk = make_product('milk', 1, 'l')
 milk.save()
-tom1 = Product(name='tomato', quantity=3, unit='kg')
+tom1 = make_product('tomato', 3, 'kg')
 tom1.save()
-milk1 = Product(name='milk', quantity=1, unit='l')
-milk1.save()'''
-'''
-tom2 = Product(name='tomato', quantity=3, unit='kg')
-tom2.save()
-milk2 = Product(name='milk', quantity=1, unit='l')
-milk2.save()
-recipe_1 = Recipe(name='salat', description='very tasty', products=[tom])
-recipe_1.save()
-recipe_2 = Recipe(name='milk', description='for me', products = [milk])
-recipe_2.save()
-recipe_3 = Recipe(name='salat', description='very tasty', products=[tom2])
-recipe_3.save()
-recipe_4 = Recipe(name='milk', description='for me', products=[milk2])
-recipe_4.save()
-first_day = Day_plan(date=date_time_obj.date(), day='Monday', recipes=[recipe_1, recipe_2])
-first_day.save()
-second_day = Day_plan(date=date_time_obj.date()+datetime.timedelta(days=1), day='Monday', recipes=[recipe_3, recipe_4])
-second_day.save()'''
+milk1 = make_product('milk', 1, 'l')
+milk1.save()
 
-'''new_user = User(user_id=16, full_plan=[], available_products=[tom, milk], separate_products=[tom1, milk1])
+new_user = User(user_id=16, full_plan=[], available_products=[tom, milk], separate_products=[tom1, milk1])
 new_user.save()
 
-tom2 = Product(name='tomato', quantity=3, unit='kg')
+tom2 = make_product('tomato', 3, 'kg')
 tom2.save()
 prod1 = make_product('bread', 1, 'kg')
-prod2 = make_product('sugar', 0.6, 'kg')
-prod3 = make_product('sugar', 0.6, 'kg')
-add_new_day(16, datetime.date.today())
-recipe1 = make_new_recipe('buter', 'vkusno', [prod1, prod2])
-recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', [prod3, tom2])
-add_recipe_to_day(16, datetime.date.today(), recipe1)
-add_recipe_to_day(16, datetime.date.today(), recipe2)
+prod2 = make_product('tomato', 0.6, 'kg')
+prod3 = make_product('sugar', 0.6, 'none')
+add_new_day(16, '2021-05-19', 'Monday')
+recipe1 = make_new_recipe('buter', 'vkusno', 2, [prod1, prod2])
+recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', 3, [prod3, tom2])
+add_recipe_to_day(16, '2021-05-19', recipe1, 'Monday')
+add_recipe_to_day(16, '2021-05-19',recipe2, 'Monday')
 
 print_all_user_info(16)
 
 
-l = give_grocery_list(16)
+l = give_grocery_list_for_day(16, '2021-05-19')
 print(l)
-for el in l:
-    print(l[el][0])'''
+g = give_grocery_list_for_clear_day(16, '2021-05-19')
+print(g)
+h = give_grocery_list_for_recipe(16, '2021-05-19', 'buter')
+print(h)
+'''
