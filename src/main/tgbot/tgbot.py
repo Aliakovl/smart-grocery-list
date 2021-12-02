@@ -16,9 +16,9 @@ grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 milliliters = ['мл', 'миллилитр', 'миллилитра', 'миллилитров']
 
-tea_spoon = ['чайная ложка', 'ч.ложка','чайн.ложка','чайная л']
-table_spoon = ['столовая ложка', 'ст.ложка','стол.ложка','столовая л']
-glass = ['стакан', 'стак','ст']
+tea_spoon = ['чайная ложка', 'ч. ложка', 'чайн. ложка', 'чайная л', 'ч. ложек']
+table_spoon = ['столовая ложка', 'ст. ложка', 'стол. ложка', 'столовая л', 'cт. ложек']
+glass = ['стакан', 'стак', 'ст']
 
 dict_for_glass = {
     'сахар': '200',
@@ -42,7 +42,7 @@ dict_for_tablespoon = {
     'мед': '30',
     'масло': '17',
     'желатин': '10',
-    'сода': '8,5',
+    'сода': '8.5',
     'томатная паста': '24',
     'соль': '30'
 
@@ -193,21 +193,31 @@ def show_recipes_handler(message):
 
 # convert measure and quality to grams or milliliters.
 def unification(ingrt, quantity, measure):
+    print(ingrt)
     new_quantity = quantity
     found = False
 
     if find_typos(measure, tea_spoon):
-        quan = dict_of_products['чайная ложка'][ingrt]
+        if ingrt in dict_of_products['чайная ложка']:
+            quan = dict_of_products['чайная ложка'][ingrt]
+        else:
+            quan = '10'
         new_quantity = float(quan) * quantity
         found = True
 
     if find_typos(measure, table_spoon):
-        quan = dict_of_products['столовая ложка'][ingrt]
+        if ingrt in dict_of_products['столовая ложка']:
+            quan = dict_of_products['столовая ложка'][ingrt]
+        else:
+            quan = '20'
         new_quantity = float(quan) * quantity
         found = True
 
     if find_typos(measure, glass):
-        quan = dict_of_products['стакан'][ingrt]
+        if ingrt in dict_of_products['стакан'][ingrt]:
+            quan = dict_of_products['стакан'][ingrt]
+        else:
+            quan = '250'
         new_quantity = float(quan) * quantity
         found = True
 

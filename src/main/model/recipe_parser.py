@@ -82,6 +82,7 @@ class ParserRecipe:
     def pipe(self):
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
+        print(ingrs, ingrs_size)
 
         reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
         nums = []
