@@ -4,7 +4,8 @@ from telebot import types, TeleBot
 from os import getenv
 from datetime import date
 from src.main.mongo.mongo_db import *
-from src.main.model.recipe_parser import ParserRecipe
+#from src.main.model.recipe_parser import ParserRecipe
+from src.main.model.typos_search import *
 
 
 TOKEN = getenv('TELEGRAM_TOKEN')
@@ -14,6 +15,10 @@ pieces = ['шт', 'штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 milliliters = ['мл', 'миллилитр', 'миллилитра', 'миллилитров']
+
+tea_spoon = ['чайная ложка', 'ч.ложка','чайн.ложка','чайная л']
+table_spoon = ['столовая ложка', 'ст.ложка','стол.ложка','столовая л']
+glass = ['стакан', 'стак','ст']
 
 dict_for_glass = {
     'сахар': '200',
@@ -190,27 +195,26 @@ def unification(ingrt, quantity, measure):
     new_quantity = quantity
     found = False
 
-    if dict_of_products.get(measure):
-        if measure == 'чайная ложка':
-            quan = dict_of_products['чайная ложка'][ingrt]
-            new_quantity = float(quan) * quantity
-            found = True
+    if find_typos(measure, tea_spoon):
+        quan = dict_of_products['чайная ложка'][ingrt]
+        new_quantity = float(quan) * quantity
+        found = True
 
-        if measure == 'столовая ложка':
-            quan = dict_of_products['столовая ложка'][ingrt]
-            new_quantity = float(quan) * quantity
-            found = True
+    if find_typos(measure, table_spoon):
+        quan = dict_of_products['столовая ложка'][ingrt]
+        new_quantity = float(quan) * quantity
+        found = True
 
-        if measure == 'стакан':
-            quan = dict_of_products['стакан'][ingrt]
-            new_quantity = float(quan) * quantity
-            found = True
+    if find_typos(measure, glass):
+        quan = dict_of_products['стакан'][ingrt]
+        new_quantity = float(quan) * quantity
+        found = True
 
-        if found:
-            if ingrt in liquid:
-                return ingrt, new_quantity, 'мл'
-            else:
-                return ingrt, new_quantity, 'г'
+    if found:
+        if ingrt in liquid:
+            return ingrt, new_quantity, 'мл'
+        else:
+            return ingrt, new_quantity, 'г'
     else:
         if measure in pieces:
             return ingrt, quantity, pieces[0]
@@ -220,6 +224,7 @@ def unification(ingrt, quantity, measure):
             return ingrt, quantity, kilograms[0]
         if measure in milliliters:
             return ingrt, quantity, milliliters[0]
+        return ingrt, quantity, 'None'
 
 
 @bot.message_handler(func=lambda message: 'entities' in message.json and message.json['entities'][0]['type'] == 'url')

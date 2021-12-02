@@ -16,7 +16,7 @@ class ParserRecipe:
 
         page = requests.get(self.url)
 
-        # get page of the user's recepy
+        # get page of the user's recipe
         soup = BeautifulSoup(page.text, "html.parser")
 
         # find href for printing
@@ -40,8 +40,8 @@ class ParserRecipe:
                 recipe.append(data.text)
         return recipe[0]
 
+    # print ingredients and units
     def ingred_units(self):
-        # print ingredients and units
         allIngr = self.soup.findAll('div', class_='ingredients')
         ingrs = []
         ingrs_size = []
@@ -63,6 +63,7 @@ class ParserRecipe:
             ingrs_size.append(ingr_size.replace(u'\xa0', u''))
         return ingrs, ingrs_size
 
+    # pipe: call all functions from this class.
     def pipe(self):
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
@@ -73,6 +74,7 @@ class ParserRecipe:
             ns = [float(j) for j in line.split('-')]
             av = sum(ns) / len(ns)
             nums.append(av)
+        check_ingred()
         return list(zip(ingrs, nums, ingrs_size))
 
     def get_name(self):
