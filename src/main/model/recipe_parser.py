@@ -16,7 +16,7 @@ class ParserRecipe:
 
         page = requests.get(self.url)
 
-        # get page of the user's recepy
+        # get page of the user's recipe
         soup = BeautifulSoup(page.text, "html.parser")
 
         # find href for printing
@@ -40,8 +40,8 @@ class ParserRecipe:
                 recipe.append(data.text)
         return recipe[0]
 
+    # print ingredients and units
     def ingred_units(self):
-        # print ingredients and units
         allIngr = self.soup.findAll('div', class_='ingredients')
         ingrs = []
         ingrs_size = []
@@ -63,22 +63,43 @@ class ParserRecipe:
             ingrs_size.append(ingr_size.replace(u'\xa0', u''))
         return ingrs, ingrs_size
 
+    # parse several ingredients.
+    def check_ingrs(self, ingrs, nums, ingrs_size):
+        new_ingrs = []
+        new_nums = []
+        new_ingrs_size = []
+        for i in range(len(ingrs)):
+            ns = [j for j in ingrs[i].split(',')]
+
+            for j in ns:
+                new_ingrs.append(j)
+                new_nums.append(nums[i])
+                new_ingrs_size.append(ingrs_size[i])
+
+        return new_ingrs, new_nums, new_ingrs_size
+
+    # pipe: call all functions from this class.
     def pipe(self):
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
+        print(ingrs, ingrs_size)
+
         reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
         nums = []
-        for a in ingrs_size:
-            line = re.sub(reg, r'\1', a, flags=re.X)
+        for i in range(len(ingrs_size)):
+            line = re.sub(reg, r'\1', ingrs_size[i], flags=re.X)
             ns = [float(j) for j in line.split('-')]
             av = sum(ns) / len(ns)
             nums.append(av)
+            ingrs_size[i] = ingrs_size[i].replace(line, '')
+
+        ingrs, nums, ingrs_size = self.check_ingrs(ingrs, nums, ingrs_size)
+
         return list(zip(ingrs, nums, ingrs_size))
 
     def get_name(self):
         return self.name
 
 
-# recipe
 # parser = ParserRecipe('https://povar.ru/recipes/sup_harcho_iz_baraniny_klassicheskii-57059.html')
 # print(parser.pipe())
