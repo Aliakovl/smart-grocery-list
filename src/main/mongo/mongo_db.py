@@ -40,8 +40,7 @@ class User(Document):  # общая информация о пользовате
 # создание нового пользователя при его первичном обращении к боту
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
-        u = User.objects.get(user_id=u_id)
-        u.modify(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
+        delete_all_user_info(u_id)
         # delete_all_user_info(u_id)
         return
     user_new = User(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
@@ -55,6 +54,9 @@ def delete_all_user_info(u_id):
     delete_user_plan(u_id)
     delete_user_av_products(u_id)
     delete_user_sep_products(u_id)
+    set_user_state(u_id, 1)
+    set_user_n_days(u_id, 0)
+    set_user_day(u_id, 0)
 
 
 # очистить план на неделю (или другой промежуток времени) полностью
