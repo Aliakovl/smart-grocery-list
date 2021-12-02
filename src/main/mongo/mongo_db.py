@@ -323,6 +323,14 @@ def get_day(user, day_date):
     return 0
 
 
+def get_recipe(user, day_date, recipe_name):
+    day = get_day(user, day_date)
+    for rec in day.recipes:
+        if rec.name == recipe_name:
+            return rec
+    return 0
+
+
 # получение state пользователя
 def get_user_state(u_id):
     u = User.objects.get(user_id=u_id)
@@ -453,6 +461,50 @@ def give_grocery_list_for_day(u_id, day_date):
     return dict_grocery
 
 
+# получение всей продуктовой корзины для конкретного дня !!!! без учета доступных продуктов
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
+def give_grocery_list_for_clear_day(u_id, day_date):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    day_plan = get_day(u, day_date)
+    for rec in day_plan.recipes:
+        for prod in rec.products:
+            if prod.name in dict_grocery:
+                el = dict_grocery[prod.name]
+                if prod.unit != 'none':
+                    el[0] += prod.quantity*rec.portion_count
+                el[2] = el[2] or prod.has_null_parts
+                dict_grocery[prod.name] = el
+            else:
+                if prod.unit == 'none':
+                    qua = 0
+                else:
+                    qua = prod.quantity * rec.portion_count
+                dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
+    return dict_grocery
+
+
+# получение всей продуктовой корзины для рецепта
+def give_grocery_list_for_recipe(u_id, day_date, recipe_name):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    recipe = get_recipe(u, day_date, recipe_name)
+    for prod in recipe.products:
+        if prod.name in dict_grocery:
+            el = dict_grocery[prod.name]
+            if prod.unit != 'none':
+                el[0] += prod.quantity*recipe.portion_count
+            el[2] = el[2] or prod.has_null_parts
+            dict_grocery[prod.name] = el
+        else:
+            if prod.unit == 'none':
+                qua = 0
+            else:
+                qua = prod.quantity * recipe.portion_count
+            dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
+    return dict_grocery
+
+
 # функция вспомогательная, для отладки
 # TODO: delete this
 def print_all_user_info(u_id):
@@ -491,17 +543,21 @@ new_user.save()
 tom2 = make_product('tomato', 3, 'kg')
 tom2.save()
 prod1 = make_product('bread', 1, 'kg')
-prod2 = make_product('sugar', 0.6, 'kg')
+prod2 = make_product('tomato', 0.6, 'kg')
 prod3 = make_product('sugar', 0.6, 'none')
 add_new_day(16, '2021-05-19', 'Monday')
 recipe1 = make_new_recipe('buter', 'vkusno', 2, [prod1, prod2])
 recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', 3, [prod3, tom2])
-add_recipe_to_day(16, '2021-05-19', recipe1, 'Monday',)
-add_recipe_to_day(16, '2021-05-17',recipe2, 'Sunday')
+add_recipe_to_day(16, '2021-05-19', recipe1, 'Monday')
+add_recipe_to_day(16, '2021-05-19',recipe2, 'Monday')
 
 print_all_user_info(16)
 
 
 l = give_grocery_list_for_day(16, '2021-05-19')
 print(l)
+g = give_grocery_list_for_clear_day(16, '2021-05-19')
+print(g)
+h = give_grocery_list_for_recipe(16, '2021-05-19', 'buter')
+print(h)
 '''
