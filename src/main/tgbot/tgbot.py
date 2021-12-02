@@ -14,6 +14,7 @@ pieces = ['штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 
+
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
     start_button = types.KeyboardButton('/start')
@@ -78,7 +79,6 @@ def start_command(message):
 def number_handler(message):
     user_id = message.from_user.id
     print(message)
-    # print(get_user_state(user_id))
     if get_user_state(user_id) == 1:
         set_user_state(user_id, 2)
         set_user_n_days(user_id, int(message.text))
@@ -87,7 +87,8 @@ def number_handler(message):
         print(my_date)
         day_nm = day_name[my_date.weekday()]
         print(my_date.weekday())
-        bot.send_message(message.from_user.id, f"Добавте ссылки на рецепты {day_nm}", reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f'Искать рецепты здесь: https://povar.ru')
+        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}", reply_markup=next_day_button())
 
 
 @bot.message_handler(commands=['next_day'])
@@ -123,10 +124,15 @@ def generate_list_handler(message):
             if quantity >= 1000:
                 quantity /= 1000
                 units = kilograms[0]
+            answer = ''
             if units == 'none':
-                bot.send_message(message.from_user.id, f'{product}')
+                answer = answer + f'{product}'
+                # bot.send_message(message.from_user.id, f'{product}')
             else:
-                bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
+                answer = answer + f'{product}: {float(quantity):g} {units}'
+                # bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
+            print(answer)
+            bot.send_message(message.from_user.id, answer)
 
 
 @bot.message_handler(commands=['show_recipes'])
@@ -140,6 +146,15 @@ def show_recipes_handler(message):
             for recipe, uri in recipes[day].items():
                 keyboard.add(types.InlineKeyboardButton(text=recipe, url=uri))
             bot.send_message(message.from_user.id, f'{day_n}:   {day}', reply_markup=keyboard)
+
+
+@bot.message_handler(commands=['have'])
+def have_product_handler(message):
+    user_id = message.from_user.id
+    print(message.json['reply_to_message']['text'])
+    print(message.text)
+    print(message.entities[0])
+
 
 
 def unification(units):
@@ -177,6 +192,7 @@ def link_handler(message):
             day_nm = day_name[next_day.weekday()]
             parser = ParserRecipe(url)
             ingredients = parser.pipe()
+            print(ingredients)
             products = []
             for name, quantity, units in ingredients:
                 u_units = unification(units)
@@ -191,7 +207,12 @@ def link_handler(message):
 
 @bot.message_handler(regexp=r'(.*)')
 def start_command(message):
+    print(message)
     bot.send_message(message.chat.id, "Я не понимаю :(")
+    bot.send_message(message.chat.id, "wefwef\nwefwefwef\nwefwef\nwewf")
+    bot.send_message(chat_id=message.chat.id,
+                     text="wefwefwefwef [inline](tg://\start)",
+                     parse_mode='MarkdownV2')
     print(bot.get_me())
 
 
