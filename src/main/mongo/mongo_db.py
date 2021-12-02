@@ -405,8 +405,12 @@ def give_grocery_list(u_id):
         if av_prod.name in dict_grocery:
             el = dict_grocery[av_prod.name]
             el[0] -= av_prod.quantity
-            if el[0] <= 0:
+            if el[0] <= 0 and not av_prod.has_null_parts:
                 dict_grocery.pop(av_prod.name)
+            elif el[0] <= 0 and av_prod.has_null_parts:
+                el[0] = 0
+                el[2] = True
+                dict_grocery[av_prod.name] = el
             else:
                 dict_grocery[av_prod.name] = el
     return dict_grocery
