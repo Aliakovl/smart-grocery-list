@@ -2,17 +2,66 @@ import datetime
 
 from telebot import types, TeleBot
 from os import getenv
-from src.main.model.model import *
 from datetime import date
 from src.main.mongo.mongo_db import *
 from src.main.model.recipe_parser import ParserRecipe
+from src.main.model.typos_search import *
+
 
 TOKEN = getenv('TELEGRAM_TOKEN')
 bot = TeleBot(token=TOKEN)
 day_name = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-pieces = ['штуки', 'штука', 'штук']
+pieces = ['шт', 'штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
+milliliters = ['мл', 'миллилитр', 'миллилитра', 'миллилитров']
+
+tea_spoon = ['чайная ложка', 'ч. ложка', 'чайн. ложка', 'чайная л', 'ч. ложек']
+table_spoon = ['столовая ложка', 'ст. ложка', 'стол. ложка', 'столовая л', 'cт. ложек']
+glass = ['стакан', 'стак', 'ст']
+
+dict_for_glass = {
+    'сахар': '200',
+    'крахмал': '160',
+    'мука': '160',
+    'молоко': '250',
+    'мед': '415',
+    'масло': '225',
+    'вода': '200',
+    'сливки': '230',
+    'сметана': '230',
+    'рис': '180',
+    'гречка': '165',
+    'манка': '160'
+}
+dict_for_tablespoon = {
+    'сахар': '25',
+    'крахмал': '12',
+    'мука': '25',
+    'молоко': '20',
+    'мед': '30',
+    'масло': '17',
+    'желатин': '10',
+    'сода': '8.5',
+    'томатная паста': '24',
+    'соль': '30'
+
+}
+dict_for_teaspoon = {
+    'сахар': '8',
+    'крахмал': '6',
+    'мука': '8',
+    'молоко': '5',
+    'мед': '9',
+    'масло': '5',
+    'соль': '10'
+}
+dict_of_products = {
+    'стакан': dict_for_glass,
+    'столовая ложка': dict_for_tablespoon,
+    'чайная ложка': dict_for_teaspoon
+}
+liquid = ['молоко', 'растительное масло', 'вода', 'сливки', 'кефир', 'коньяк', 'вино', 'уксус']
 
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
@@ -142,22 +191,51 @@ def show_recipes_handler(message):
             bot.send_message(message.from_user.id, f'{day_n}:   {day}', reply_markup=keyboard)
 
 
-def unification(units):
-    units = units.strip().lower()
-    for piece in pieces:
-        if piece in units:
-            return pieces[0]
-    if units == kilograms[0]:
-        return kilograms[0]
-    for kilogram in kilograms[1:]:
-        if kilogram in units:
-            return kilograms[0]
-    if units == grams[0] or units == grams[1]:
-        return grams[0]
-    for gram in grams[2:]:
-        if gram in units:
-            return grams[0]
-    return 'none'
+# convert measure and quality to grams or milliliters.
+def unification(ingrt, quantity, measure):
+    print(ingrt)
+    new_quantity = quantity
+    found = False
+
+    if find_typos(measure, tea_spoon):
+        if ingrt in dict_of_products['чайная ложка']:
+            quan = dict_of_products['чайная ложка'][ingrt]
+        else:
+            quan = '10'
+        new_quantity = float(quan) * quantity
+        found = True
+
+    if find_typos(measure, table_spoon):
+        if ingrt in dict_of_products['столовая ложка']:
+            quan = dict_of_products['столовая ложка'][ingrt]
+        else:
+            quan = '20'
+        new_quantity = float(quan) * quantity
+        found = True
+
+    if find_typos(measure, glass):
+        if ingrt in dict_of_products['стакан'][ingrt]:
+            quan = dict_of_products['стакан'][ingrt]
+        else:
+            quan = '250'
+        new_quantity = float(quan) * quantity
+        found = True
+
+    if found:
+        if ingrt in liquid:
+            return ingrt, new_quantity, 'мл'
+        else:
+            return ingrt, new_quantity, 'г'
+    else:
+        if find_typos(measure, pieces):
+            return ingrt, quantity, pieces[0]
+        if find_typos(measure, grams):
+            return ingrt, quantity, grams[0]
+        if find_typos(measure, kilograms):
+            return ingrt, quantity, kilograms[0]
+        if find_typos(measure, milliliters):
+            return ingrt, quantity, milliliters[0]
+        return ingrt, quantity, 'none'
 
 
 @bot.message_handler(func=lambda message: 'entities' in message.json and message.json['entities'][0]['type'] == 'url')
@@ -179,7 +257,7 @@ def link_handler(message):
             ingredients = parser.pipe()
             products = []
             for name, quantity, units in ingredients:
-                u_units = unification(units)
+                name, quantity, u_units = unification(name, quantity, units)
                 if u_units == kilograms[0]:
                     quantity *= 1000
                     u_units = grams[0]
