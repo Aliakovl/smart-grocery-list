@@ -243,7 +243,7 @@ def make_new_recipe(recipe_name, recipe_description='', recipe_count=1,  *produc
 
 
 # добавление нового рецепта в план
-def add_recipe_to_day(u_id, day_date, recipe, *day):
+def add_recipe_to_day(u_id, day_date, recipe, day):
     add_new_day(u_id, day_date, day, recipe)
 
 
@@ -416,6 +416,43 @@ def give_grocery_list(u_id):
     return dict_grocery
 
 
+# получение всей продуктовой корзины для конкретного дня !!!!с учетом доступных продуктов
+# возвращает словарь продукт:([количество, единица измерения, нужно ли купить немного больше])
+def give_grocery_list_for_day(u_id, day_date):
+    dict_grocery = {}
+    u = User.objects.get(user_id=u_id)
+    day_plan = get_day(u, day_date)
+    for rec in day_plan.recipes:
+        for prod in rec.products:
+            if prod.name in dict_grocery:
+                el = dict_grocery[prod.name]
+                if prod.unit != 'none':
+                    el[0] += prod.quantity*rec.portion_count
+                el[2] = el[2] or prod.has_null_parts
+                dict_grocery[prod.name] = el
+            else:
+                if prod.unit == 'none':
+                    qua = 0
+                else:
+                    qua = prod.quantity * rec.portion_count
+                dict_grocery[prod.name] = [qua, prod.unit, prod.has_null_parts]
+    for av_prod in u.available_products:
+        if av_prod.unit == 'none':
+            continue
+        if av_prod.name in dict_grocery:
+            el = dict_grocery[av_prod.name]
+            el[0] -= av_prod.quantity
+            if el[0] <= 0 and not av_prod.has_null_parts:
+                dict_grocery.pop(av_prod.name)
+            elif el[0] <= 0 and av_prod.has_null_parts:
+                el[0] = 0
+                el[2] = True
+                dict_grocery[av_prod.name] = el
+            else:
+                dict_grocery[av_prod.name] = el
+    return dict_grocery
+
+
 # функция вспомогательная, для отладки
 # TODO: delete this
 def print_all_user_info(u_id):
@@ -459,11 +496,12 @@ prod3 = make_product('sugar', 0.6, 'none')
 add_new_day(16, '2021-05-19', 'Monday')
 recipe1 = make_new_recipe('buter', 'vkusno', 2, [prod1, prod2])
 recipe2 = make_new_recipe('bu-buter', 'vkusno-o-o', 3, [prod3, tom2])
-add_recipe_to_day(16, '2021-05-19', recipe1)
-add_recipe_to_day(16, '2021-05-19', recipe2)
+add_recipe_to_day(16, '2021-05-19', recipe1, 'Monday',)
+add_recipe_to_day(16, '2021-05-17',recipe2, 'Sunday')
 
 print_all_user_info(16)
 
 
-l = give_grocery_list(16)
-print(l)'''
+l = give_grocery_list_for_day(16, '2021-05-19')
+print(l)
+'''
