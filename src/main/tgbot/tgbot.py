@@ -14,6 +14,7 @@ pieces = ['штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 
+
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
     start_button = types.KeyboardButton('/start')
@@ -52,13 +53,25 @@ def add_product_button():
     generate_list = types.KeyboardButton("/generate_list")
     show_recipes = types.KeyboardButton("/show_recipes")
     add_available_products = types.KeyboardButton("/i_have_some")
+    add_separate_product = types.KeyboardButton("/add_separate")
     makeup.row(generate_list)
     makeup.row(show_recipes)
     makeup.row(add_available_products)
+    makeup.row(add_separate_product)
     return makeup
 
 
 make_init_buttons()
+
+
+@bot.message_handler(commands=['add_separate'])
+def separate_product_handler(message):
+    print(message.text)
+    user_id = message.from_user.id
+    p_name, p_qua, p_unit = message.text.split(' ')
+    if get_user_state(user_id) == 1:
+        add_to_separate_products(user_id, p_name, p_qua, p_unit)
+        bot.send_message(user_id, f"Добавил {p_name} в список")
 
 
 @bot.message_handler(commands=['i_have_some'])
@@ -101,7 +114,7 @@ def next_day_handler(message):
             print(next_day)
             print(next_day.weekday())
             day_nm = day_name[next_day.weekday()]
-            bot.send_message(message.from_user.id, f"Добавте ссылки на рецепты {day_nm}",
+            bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}",
                              reply_markup=next_day_button())
             decrease_user_day(user_id)
         else:
@@ -187,6 +200,7 @@ def link_handler(message):
             description = url
             name = parser.get_name()
             add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, products))
+
 
 
 @bot.message_handler(regexp=r'(.*)')
