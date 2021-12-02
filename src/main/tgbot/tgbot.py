@@ -2,7 +2,6 @@ import datetime
 
 from telebot import types, TeleBot
 from os import getenv
-from src.main.model.model import *
 from datetime import date
 from src.main.mongo.mongo_db import *
 from src.main.model.recipe_parser import ParserRecipe
@@ -68,6 +67,9 @@ liquid = ['молоко', 'растительное масло', 'вода', 'с
 
 
 connect_to_base()
+
+connect_to_base()
+
 
 def make_init_buttons():
     init_markup = types.ReplyKeyboardMarkup(False, True)
@@ -146,7 +148,8 @@ def start_command(message):
     print(user_id)
     make_new_user(user_id)
     print_all_user_info(user_id)
-    bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?", reply_markup=make_days_buttons())
+    bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?",
+                     reply_markup=make_days_buttons())
 
 
 @bot.message_handler(commands=['add_separate'])
@@ -161,7 +164,6 @@ def separate_product_handler(message):
 def number_handler(message):
     user_id = message.from_user.id
     print(message)
-    # print(get_user_state(user_id))
     if get_user_state(user_id) == 1:
         set_user_state(user_id, 2)
         set_user_n_days(user_id, int(message.text))
@@ -170,8 +172,8 @@ def number_handler(message):
         print(my_date)
         day_nm = day_name[my_date.weekday()]
         print(my_date.weekday())
-        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты в {day_nm}\n",
-                         reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f'Искать рецепты здесь: https://povar.ru', reply_markup=next_day_button())
+        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}")
 
 
 @bot.message_handler(commands=['next_day'])
@@ -207,10 +209,15 @@ def generate_list_handler(message):
             if quantity >= 1000:
                 quantity /= 1000
                 units = kilograms[0]
+            answer = ''
             if units == 'none':
-                bot.send_message(message.from_user.id, f'{product}')
+                answer = answer + f'{product}'
+                # bot.send_message(message.from_user.id, f'{product}')
             else:
-                bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
+                answer = answer + f'{product}: {float(quantity):g} {units}'
+                # bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
+            print(answer)
+            bot.send_message(message.from_user.id, answer)
 
 
 @bot.message_handler(commands=['show_recipes'])
@@ -224,6 +231,20 @@ def show_recipes_handler(message):
             for recipe, uri in recipes[day].items():
                 keyboard.add(types.InlineKeyboardButton(text=recipe, url=uri))
             bot.send_message(message.from_user.id, f'{day_n}:   {day}', reply_markup=keyboard)
+
+
+@bot.message_handler(commands=['have'])
+def have_product_handler(message):
+    user_id = message.from_user.id
+    text = message.json['reply_to_message']['text']
+    if ':' not in text:
+        add_to_available_products(user_id, text.strip(), 0, 'none')
+    else:
+        product = text.split(':')
+        product_name = product[0]
+        [quantity, units] = product[1].strip().split(' ')
+        available_quantity = message.text[message.entities[0].length:].strip()
+        add_to_available_products(user_id, product_name, available_quantity, units)
 
 
 def unification(units):
@@ -261,6 +282,7 @@ def link_handler(message):
             day_nm = day_name[next_day.weekday()]
             parser = ParserRecipe(url)
             ingredients = parser.pipe()
+            print(ingredients)
             products = []
             for name, quantity, units in ingredients:
                 u_units = unification(units)
@@ -270,7 +292,7 @@ def link_handler(message):
                 products.append(make_product(name, quantity, u_units))
             description = url
             name = parser.get_name()
-            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, products))
+            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, 1, products))
 
 
 @bot.message_handler(commands=['end_add'])
@@ -297,16 +319,7 @@ def other_handler(message):
         bot.send_message(user_id, f"""Добавил {p_name} в список!
 Можешь добавить еще продуктов.
 Если закончил - отправь /end_add""", reply_markup=inside_add_product())
-    
 
-
-
-@bot.message_handler(content_types=['photo'])
-def photo_handler(message):
-    file_id = message.json['photo'][-1]['file_id']
-    print(bot.get_file(file_id))
-    print(bot.get_file_url(file_id))
-    print(file_id)
 
 
 if __name__ == '__main__':
