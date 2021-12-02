@@ -176,7 +176,7 @@ def link_handler(message):
             print(next_day.weekday())
             day_nm = day_name[next_day.weekday()]
             parser = ParserRecipe(url)
-            ingredients = parser.pipe()
+            num_of_portions, ingredients = parser.pipe()
             products = []
             for name, quantity, units in ingredients:
                 u_units = unification(units)

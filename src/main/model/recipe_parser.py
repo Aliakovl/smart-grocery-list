@@ -16,7 +16,7 @@ class ParserRecipe:
 
         page = requests.get(self.url)
 
-        # get page of the user's recepy
+        # get page of the user's recipe
         soup = BeautifulSoup(page.text, "html.parser")
 
         # find href for printing
@@ -39,6 +39,21 @@ class ParserRecipe:
             if data.find('li') is not None:
                 recipe.append(data.text)
         return recipe[0]
+
+    def get_portions(self):
+        recipies = self.soup.findAll('div', class_='time_count')
+
+        recipe = []
+        for data in recipies:
+            if data.find('span') is not None:
+                recipe.append(data.findAll('span'))
+
+        reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
+        num_portions = 0
+        line = re.sub(reg, r'\1', recipe[0][1].text, flags=re.X)
+        ns = [int(j) for j in line.split('-')]
+        num_portions = sum(ns) / len(ns)
+        return num_portions
 
     def ingred_units(self):
         # print ingredients and units
@@ -66,6 +81,8 @@ class ParserRecipe:
     def pipe(self):
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
+        num_of_portions = self.get_portions()
+
         reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
         nums = []
         for a in ingrs_size:
@@ -73,7 +90,7 @@ class ParserRecipe:
             ns = [float(j) for j in line.split('-')]
             av = sum(ns) / len(ns)
             nums.append(av)
-        return list(zip(ingrs, nums, ingrs_size))
+        return num_of_portions, list(zip(ingrs, nums, ingrs_size))
 
     def get_name(self):
         return self.name
