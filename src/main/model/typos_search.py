@@ -10,7 +10,7 @@ def find_typos(text, words=None):
         if new_rate < rate:
             final_word = word
             rate = new_rate
-    if rate > 0.50:
+    if rate > 0.40:
         return False
     if rate == 0.0:
         return True

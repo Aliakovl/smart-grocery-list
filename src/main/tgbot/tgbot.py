@@ -4,7 +4,7 @@ from telebot import types, TeleBot
 from os import getenv
 from datetime import date
 from src.main.mongo.mongo_db import *
-#from src.main.model.recipe_parser import ParserRecipe
+from src.main.model.recipe_parser import ParserRecipe
 from src.main.model.typos_search import *
 
 
@@ -190,6 +190,7 @@ def show_recipes_handler(message):
                 keyboard.add(types.InlineKeyboardButton(text=recipe, url=uri))
             bot.send_message(message.from_user.id, f'{day_n}:   {day}', reply_markup=keyboard)
 
+
 # convert measure and quality to grams or milliliters.
 def unification(ingrt, quantity, measure):
     new_quantity = quantity
@@ -216,15 +217,15 @@ def unification(ingrt, quantity, measure):
         else:
             return ingrt, new_quantity, 'г'
     else:
-        if measure in pieces:
+        if find_typos(measure, pieces):
             return ingrt, quantity, pieces[0]
-        if measure in grams:
+        if find_typos(measure, grams):
             return ingrt, quantity, grams[0]
-        if measure in kilograms:
+        if find_typos(measure, kilograms):
             return ingrt, quantity, kilograms[0]
-        if measure in milliliters:
+        if find_typos(measure, milliliters):
             return ingrt, quantity, milliliters[0]
-        return ingrt, quantity, 'None'
+        return ingrt, quantity, 'none'
 
 
 @bot.message_handler(func=lambda message: 'entities' in message.json and message.json['entities'][0]['type'] == 'url')
