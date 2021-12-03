@@ -144,7 +144,6 @@ def start_command(message):
     user_id = message.from_user.id
     print(user_id)
     make_new_user(user_id)
-    print_all_user_info(user_id)
     site_url = "https://povar.ru"
     bot.send_message(message.from_user.id, f'Начнем составлять меню!\nОтправляйте мне ссылки на рецепты с сайта {site_url}', reply_markup=next_day_button())
     bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?",
@@ -377,7 +376,6 @@ def new_plan_handler(message):
     user_id = message.from_user.id
     print(user_id)
     make_new_user(user_id)
-    print_all_user_info(user_id)
     site_url = "https://povar.ru"
     bot.send_message(message.from_user.id, f'Сайт не изменился: {site_url}')
     bot.send_message(message.from_user.id, "На сколько дней вперёд планируем на этот раз?",
