@@ -40,6 +40,22 @@ class ParserRecipe:
                 recipe.append(data.text)
         return recipe[0]
 
+    def get_portions(self):
+        recipies = self.soup.findAll('div', class_='time_count')
+
+        recipe = []
+        for data in recipies:
+            if data.find('span') is not None:
+                recipe.append(data.findAll('span'))
+
+        reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
+        num_portions = 0
+        line = re.sub(reg, r'\1', recipe[0][1].text, flags=re.X)
+        ns = [int(j) for j in line.split('-')]
+        num_portions = sum(ns) / len(ns)
+        return num_portions
+
+
     # print ingredients and units
     def ingred_units(self):
         allIngr = self.soup.findAll('div', class_='ingredients')
@@ -82,6 +98,7 @@ class ParserRecipe:
     def pipe(self):
         self.parse()
         ingrs, ingrs_size = self.ingred_units()
+        num_of_portions = self.get_portions()
         print(ingrs, ingrs_size)
 
         reg = r'^\D*((\d+\.?\d*)|(\d+\-\d+)).*'
@@ -95,7 +112,7 @@ class ParserRecipe:
 
         ingrs, nums, ingrs_size = self.check_ingrs(ingrs, nums, ingrs_size)
 
-        return list(zip(ingrs, nums, ingrs_size))
+        return num_of_portions, list(zip(ingrs, nums, ingrs_size))
 
     def get_name(self):
         return self.name

@@ -10,14 +10,14 @@ from src.main.model.typos_search import *
 
 TOKEN = getenv('TELEGRAM_TOKEN')
 bot = TeleBot(token=TOKEN)
-day_name = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+day_name = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
 pieces = ['шт', 'штуки', 'штука', 'штук']
 grams = ['г', 'гр', 'грамм', 'грамма']
 kilograms = ['кг', 'кило', 'килограмм', 'килограмма']
 milliliters = ['мл', 'миллилитр', 'миллилитра', 'миллилитров']
 
 
-connect_to_base()
+# connect_to_base()
 
 
 tea_spoon = ['чайная ложка', 'ч. ложка', 'чайн. ложка', 'чайная л', 'ч. ложек']
@@ -105,33 +105,31 @@ def add_product_button():
     makeup = types.ReplyKeyboardMarkup(True, False)
     generate_list = types.KeyboardButton("/generate_list")
     show_recipes = types.KeyboardButton("/show_recipes")
-    add_separate_products = types.KeyboardButton("/add_separate")
+    add_products = types.KeyboardButton("/add_products")
     makeup.row(generate_list,
                show_recipes,
-               add_separate_products)
+               add_products)
     return makeup
 
 
 def inside_add_product():
     makeup = types.ReplyKeyboardMarkup(True, False)
-    add_separate_products = types.KeyboardButton("/add_separate")
     end_adding = types.KeyboardButton("/end_add")
-    makeup.row(add_separate_products,
-               end_adding)
+    makeup.row(end_adding)
     return makeup
 
 
-make_init_buttons()
+# make_init_buttons()
 
 
-@bot.message_handler(commands=['add_separate'])
-def separate_product_handler(message):
-    print(message.text)
-    user_id = message.from_user.id
-    p_name, p_qua, p_unit = message.text.split(' ')
-    if get_user_state(user_id) == 1:
-        add_to_separate_products(user_id, p_name, p_qua, p_unit)
-        bot.send_message(user_id, f"Добавил {p_name} в список")
+# @bot.message_handler(commands=['add_separate'])
+# def separate_product_handler(message):
+#     print(message.text)
+#     user_id = message.from_user.id
+#     p_name, p_qua, p_unit = message.text.split(' ')
+#     if get_user_state(user_id) == 1:
+#         add_to_separate_products(user_id, p_name, p_qua, p_unit)
+#         bot.send_message(user_id, f"Добавил {p_name} в список")
 
 
 @bot.message_handler(commands=['i_have_some'])
@@ -145,15 +143,17 @@ def start_command(message):
     print(user_id)
     make_new_user(user_id)
     print_all_user_info(user_id)
+    site_url = "https://povar.ru"
+    bot.send_message(message.from_user.id, f'Начнем составлять меню!\nОтправляйте мне ссылки на рецепты с сайта {site_url}', reply_markup=next_day_button())
     bot.send_message(message.from_user.id, "На сколько дней вперёд вы планируете меню?",
                      reply_markup=make_days_buttons())
 
 
-@bot.message_handler(commands=['add_separate'])
+@bot.message_handler(commands=['add_products'])
 def separate_product_handler(message):
     print(message.text)
     user_id = message.from_user.id
-    bot.send_message(message.from_user.id, "Чтобы добавить продукт в список\nотправьте сообщение в формате:\nпродукт кол-во ед.изм.")
+    bot.send_message(message.from_user.id, "Чтобы добавить продукт в список отправь его в формате: \n<code>продукт количество единицы-измерения</code>", parse_mode='HTML')
     set_user_state(user_id, 4)
 
 
@@ -161,16 +161,25 @@ def separate_product_handler(message):
 def number_handler(message):
     user_id = message.from_user.id
     print(message)
-    if get_user_state(user_id) == 1:
+    try:
+        num = int(message.text)
+    except ValueError as e:
+        bot.send_message(message.from_user.id, f"Я не понимаю :(", reply_markup=make_days_buttons())
+        return
+    if get_user_state(user_id) == 1 and num < 10:
         set_user_state(user_id, 2)
-        set_user_n_days(user_id, int(message.text))
-        set_user_day(user_id, int(message.text) - 1)
+        set_user_n_days(user_id, num)
+        set_user_day(user_id, num - 1)
         my_date = date.today()
-        print(my_date)
+        print("Date is ", my_date)
         day_nm = day_name[my_date.weekday()]
-        print(my_date.weekday())
-        bot.send_message(message.from_user.id, f'Искать рецепты здесь: https://povar.ru', reply_markup=next_day_button())
-        bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}")
+        print("My day weekday ", my_date.weekday())
+        bot.send_message(message.from_user.id, f"Отправьте мне ссылку-рецепт на {my_date}, {day_nm}", reply_markup=next_day_button())
+    # elif get_user_state(user_id) == 6 and num < 10:
+    #     set_user_state(user_id, ?)
+    else:
+        bot.send_message(message.from_user.id, f"Я не понимаю :(", reply_markup=make_days_buttons())
+
 
 
 @bot.message_handler(commands=['next_day'])
@@ -184,7 +193,7 @@ def next_day_handler(message):
             print(next_day)
             print(next_day.weekday())
             day_nm = day_name[next_day.weekday()]
-            bot.send_message(message.from_user.id, f"Добавьте ссылки на рецепты {day_nm}",
+            bot.send_message(message.from_user.id, f"Отправьте мне ссылку-рецепт на {next_day}, {day_nm}",
                              reply_markup=next_day_button())
             decrease_user_day(user_id)
         else:
@@ -215,6 +224,7 @@ def generate_list_handler(message):
                 # bot.send_message(message.from_user.id, f'{product}: {float(quantity):g} {units}')
             print(answer)
             bot.send_message(message.from_user.id, answer)
+        bot.send_message(message.from_user.id, "Если у вас есть что-то из этого списка - отправьте ответ\nна сообщение с продуктом в формате\n/have количество")
 
 
 @bot.message_handler(commands=['show_recipes'])
@@ -232,16 +242,26 @@ def show_recipes_handler(message):
 
 @bot.message_handler(commands=['have'])
 def have_product_handler(message):
+    print("Here we go")
     user_id = message.from_user.id
     text = message.json['reply_to_message']['text']
     if ':' not in text:
         add_to_available_products(user_id, text.strip(), 0, 'none')
     else:
+        print("Got inside else")
         product = text.split(':')
         product_name = product[0]
         [quantity, units] = product[1].strip().split(' ')
-        available_quantity = message.text[message.entities[0].length:].strip()
-        add_to_available_products(user_id, product_name, available_quantity, units)
+        print(product[1])
+        print("units", units)
+        try:
+            available_quantity = float(message.text[message.entities[0].length:].strip())
+            print("available_quantity = ", available_quantity)
+            add_to_available_products(user_id, product_name, available_quantity, units)
+        except ValueError as e:
+            bot.send_message(message.from_user.id, "Плохое значение")
+            return
+    bot.send_message(message.from_user.id, "Изменил")
 
 
 # convert measure and quality to grams or milliliters.
@@ -307,7 +327,7 @@ def link_handler(message):
             print(next_day.weekday())
             day_nm = day_name[next_day.weekday()]
             parser = ParserRecipe(url)
-            ingredients = parser.pipe()
+            num_of_portions, ingredients = parser.pipe()
             print(ingredients)
             products = []
             for name, quantity, units in ingredients:
@@ -319,6 +339,9 @@ def link_handler(message):
             description = url
             name = parser.get_name()
             add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, 1, products))
+            bot.send_message(user_id,
+                             f"Рецепт добавлен. \nМожете отправить мне еще ссылки для {next_day}.\nЕсли вы закончили с этим днем – отправьте /next_day",
+                             )
 
 
 @bot.message_handler(commands=['end_add'])
@@ -329,6 +352,17 @@ def end_handler(message):
     bot.send_message(user_id, "Список обновлен!", reply_markup=add_product_button())
 
 
+@bot.message_handler(commands=['help'])
+def help_handler(message):
+    bot.send_message(message.from_user.id,
+                     '''Правила нашего общения:\n
+– если забыли эти правила – напишите мне /help
+– если хотите начать составлять меню – напишите мне /start
+– если хотите добавить в список покупок продукты – напишите мне /add_products
+– если хотите посмотреть на список продуктов или внести в него изменения – напишите мне /show_grocery
+– если хотите посмотреть на составленное меню – напишите мне /show_plan''')
+
+
 @bot.message_handler(regexp=r'(.*)')
 def other_handler(message):
     print(message.text)
@@ -336,20 +370,25 @@ def other_handler(message):
     if get_user_state(user_id) == 4:
         try:
             p_name, p_qua, p_unit = message.text.split(' ')
+            add_to_separate_products(user_id, p_name, float(p_qua), p_unit)
+            bot.send_message(user_id, f"""Готово! Можешь добавить еще продукты.
+Если закончил – отправь мне /end_add""", reply_markup=inside_add_product())
         except Exception as e:
+            print(e)
             bot.send_message(message.chat.id, "Я не понимаю :(")
             print(bot.get_me())
         print("a")
-        add_to_separate_products(user_id, p_name, p_qua, p_unit)
-        set_user_state(user_id, 3)
-        bot.send_message(user_id, f"""Добавил {p_name} в список!
-Можешь добавить еще продуктов.
-Если закончил - отправь /end_add""", reply_markup=inside_add_product())
+    else:
+        bot.send_message(message.chat.id, "Я не понимаю :(")
+        print(bot.get_me())
 
+
+connect_to_base()
+make_init_buttons()
 
 
 if __name__ == '__main__':
     # parser = ParserRecipe('https://povar.ru/recipes/sup_harcho_iz_baraniny_klassicheskii-57059.html')
     # ingredients = parser.pipe()
-
     bot.polling()
+    

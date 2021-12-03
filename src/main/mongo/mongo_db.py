@@ -2,7 +2,7 @@ from mongoengine import *
 
 
 # подключение к базе, по default указать имя и адрес нашей базы, где все вертится
-def connect_to_base(base_name='test_db_4', base_host='localhost', base_port=27017):
+def connect_to_base(base_name='test_db_5', base_host='localhost', base_port=27017):
     con = connect(base_name, host=base_host, port=base_port)
 
 
@@ -41,7 +41,6 @@ class User(Document):  # общая информация о пользовате
 def make_new_user(u_id):
     if len(User.objects(user_id=u_id)) != 0:  # проверка, существует ли уже пользователь
         delete_all_user_info(u_id)
-        # delete_all_user_info(u_id)
         return
     user_new = User(user_id=u_id, full_plan=[], separate_products=[], available_products=[], state=1, n_days=0, day=0)
     user_new.save()
@@ -168,6 +167,7 @@ def make_product(product_name, product_quantity, product_unit):
         is_none = True
     new_product = Product(name=product_name, quantity=product_quantity, unit=product_unit, has_null_parts=is_none)
     new_product.save()
+    print(new_product.name)
     return new_product
 
 
@@ -175,17 +175,18 @@ def make_product(product_name, product_quantity, product_unit):
 def add_to_available_products(u_id, p_name, p_qua, p_unit):
     u = User.objects.get(user_id=u_id)
     modify_prod = is_in_available_products(u, p_name)
-    if modify_prod:
+    if modify_prod is not None:
         if modify_prod.unit != p_unit:
             if modify_prod.has_null_parts and modify_prod.unit == 'none':
                 modify_prod.modify(quantity=p_qua, unit=p_unit)
                 return
             if not modify_prod.has_null_parts and p_unit == 'none':
                 modify_prod.modify(has_null_parts=True)
+                return
             print("O-o-ops, закралась другая единица измерения")
         else:
             # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
-            if modify_prod.quantity + p_qua <= 0:
+            if float(modify_prod.quantity) + p_qua <= 0:
                 delete_available_product(u_id, p_name)
                 return
             modify_prod.modify(inc__quantity=p_qua)
@@ -199,7 +200,9 @@ def add_to_available_products(u_id, p_name, p_qua, p_unit):
 def add_to_separate_products(u_id, p_name, p_qua, p_unit):
     u = User.objects.get(user_id=u_id)
     modify_prod = is_in_separate_products(u, p_name)
-    if modify_prod:
+    print("Got value of modify_prod, it is ", modify_prod)
+    if modify_prod is not None:
+        print("modify_prod value = ", modify_prod)
         if modify_prod.unit != p_unit:
             if modify_prod.has_null_parts and modify_prod.unit == 'none':
                 modify_prod.modify(quantity=p_qua, unit=p_unit)
@@ -208,16 +211,21 @@ def add_to_separate_products(u_id, p_name, p_qua, p_unit):
                 modify_prod.modify(has_null_parts=True)
             print("O-o-ops, закралась другая единица измерения")
         else:  # если уже есть такой продукт в корзине и все ок с ед.измерения -- увеличиваем кол-во
+            print("Have got into strange else")
             if modify_prod.quantity + p_qua <= 0:
                 delete_sep_product(u_id, p_name)
                 return
             modify_prod.modify(inc__quantity=p_qua)
             return
-    if p_qua < 0:
+    elif p_qua < 0:
         print("Alert: пользователь ввел отрицательное количество продукта")
         return
-    new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
-    new_product.save()
+    else:
+        print("I'm trying to make new product")
+        new_product = make_product(p_name, p_qua, p_unit)  # если нет в корзине -- добавляем в корзину
+        new_product.save()
+        print("test this")
+    
     u.modify(push__separate_products=new_product)
 
 
@@ -285,15 +293,17 @@ def is_in_available_products(user, product_name):
     for av_p in user.available_products:
         if av_p.name == product_name:
             return av_p
-    return False
+    return None
 
 
 # проверка, есть ли уже продукт в корзине(независимый от рецепта)
 def is_in_separate_products(user, product_name):
+    print("tested")
     for av_p in user.separate_products:
         if av_p.name == product_name:
             return av_p
-    return False
+    print("is_in_separate_products returns False")
+    return None
 
 
 # проверка, есть ли уже информация об этом дне
