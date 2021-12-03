@@ -256,9 +256,11 @@ def make_new_recipe(recipe_name, recipe_description='', recipe_count=1,  *produc
     return new_recipe
 
 
-def change_portions_count(u_id, day_date, recipe, portions):
+def change_portions_count(u_id, day_date, portions):
     u = User.objects.get(user_id=u_id)
-    rec = get_recipe(u, day_date, recipe)
+    day = get_day(u, day_date)
+    recipe_name = day.recipes[-1].name
+    rec = get_recipe(u, day_date, recipe_name)
     cur_portions = rec.portion_count
     rec.modify(portion_count=portions/cur_portions)
 
