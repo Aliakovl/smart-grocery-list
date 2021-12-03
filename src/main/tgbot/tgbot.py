@@ -106,11 +106,9 @@ def add_product_button():
     generate_list = types.KeyboardButton("/generate_list")
     show_recipes = types.KeyboardButton("/show_recipes")
     add_products = types.KeyboardButton("/add_products")
-    new_plan = types.KeyboardButton('/new_plan')
     makeup.row(generate_list,
                show_recipes,
                add_products)
-    makeup.row(new_plan)
     return makeup
 
 
@@ -177,14 +175,8 @@ def number_handler(message):
         day_nm = day_name[my_date.weekday()]
         print("My day weekday ", my_date.weekday())
         bot.send_message(message.from_user.id, f"Отправьте мне ссылку-рецепт на {my_date}, {day_nm}", reply_markup=next_day_button())
-    elif get_user_state(user_id) == 6 and num < 10:
-        set_user_state(user_id, 2)
-        n_day = get_user_n_days(user_id) - get_user_day(user_id) - 1
-        day_date = date.today() + datetime.timedelta(days=n_day)
-        change_portions_count(user_id, str(day_date), num)
-        bot.send_message(user_id,
-                         f"Рецепт добавлен. \nМожете отправить мне еще ссылки для {day_date}.\nЕсли вы закончили с этим днем – отправьте /next_day",
-                         reply_markup=next_day_button())
+    # elif get_user_state(user_id) == 6 and num < 10:
+    #     set_user_state(user_id, ?)
     else:
         bot.send_message(message.from_user.id, f"Я не понимаю :(", reply_markup=make_days_buttons())
 
@@ -206,7 +198,7 @@ def next_day_handler(message):
             decrease_user_day(user_id)
         else:
             set_user_state(user_id, 3)
-            bot.send_message(message.from_user.id, f"Отлично, план составлен!",
+            bot.send_message(message.from_user.id, f"Отлично, план составлен!\nДобавить еще продуктов?",
                              reply_markup=add_product_button())
 
 
@@ -346,11 +338,9 @@ def link_handler(message):
                 products.append(make_product(name, quantity, u_units))
             description = url
             name = parser.get_name()
-            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, num_of_portions, products))
-            set_user_state(user_id, 6)
+            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, 1, products))
             bot.send_message(user_id,
-                             "Сколько порций этого блюда вы будете готовить?",
-                             reply_markup=make_days_buttons()
+                             f"Рецепт добавлен. \nМожете отправить мне еще ссылки для {next_day}.\nЕсли вы закончили с этим днем – отправьте /next_day",
                              )
 
 
@@ -367,22 +357,10 @@ def help_handler(message):
     bot.send_message(message.from_user.id,
                      '''Правила нашего общения:\n
 – если забыли эти правила – напишите мне /help
-– если хотите начать составлять меню заново – напишите мне /new_plan
+– если хотите начать составлять меню – напишите мне /start
 – если хотите добавить в список покупок продукты – напишите мне /add_products
 – если хотите посмотреть на список продуктов или внести в него изменения – напишите мне /show_grocery
 – если хотите посмотреть на составленное меню – напишите мне /show_plan''')
-
-
-@bot.message_handler(commands=['new_plan'])
-def new_plan_handler(message):
-    user_id = message.from_user.id
-    print(user_id)
-    make_new_user(user_id)
-    print_all_user_info(user_id)
-    site_url = "https://povar.ru"
-    bot.send_message(message.from_user.id, f'Сайт не изменился: {site_url}')
-    bot.send_message(message.from_user.id, "На сколько дней вперёд планируем на этот раз?",
-                     reply_markup=make_days_buttons())
 
 
 @bot.message_handler(regexp=r'(.*)')
@@ -405,14 +383,12 @@ def other_handler(message):
         print(bot.get_me())
 
 
-# connect_to_base()
-# make_init_buttons()
+connect_to_base()
+make_init_buttons()
 
 
 if __name__ == '__main__':
     # parser = ParserRecipe('https://povar.ru/recipes/sup_harcho_iz_baraniny_klassicheskii-57059.html')
     # ingredients = parser.pipe()
-    connect_to_base()
-    make_init_buttons()
     bot.polling()
     
