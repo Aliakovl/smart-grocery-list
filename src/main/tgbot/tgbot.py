@@ -168,7 +168,7 @@ def number_handler(message):
     except ValueError as e:
         bot.send_message(message.from_user.id, f"Я не понимаю :(", reply_markup=make_days_buttons())
         return
-    if get_user_state(user_id) == 1 and num < 10:
+    if get_user_state(user_id) == 1:
         set_user_state(user_id, 2)
         set_user_n_days(user_id, num)
         set_user_day(user_id, num - 1)
@@ -177,7 +177,7 @@ def number_handler(message):
         day_nm = day_name[my_date.weekday()]
         print("My day weekday ", my_date.weekday())
         bot.send_message(message.from_user.id, f"Отправьте мне ссылку-рецепт на {my_date}, {day_nm}", reply_markup=next_day_button())
-    elif get_user_state(user_id) == 6 and num < 10:
+    elif get_user_state(user_id) == 6:
         set_user_state(user_id, 2)
         n_day = get_user_n_days(user_id) - get_user_day(user_id) - 1
         day_date = date.today() + datetime.timedelta(days=n_day)
@@ -187,7 +187,6 @@ def number_handler(message):
                          reply_markup=next_day_button())
     else:
         bot.send_message(message.from_user.id, f"Я не понимаю :(", reply_markup=make_days_buttons())
-
 
 
 @bot.message_handler(commands=['next_day'])
