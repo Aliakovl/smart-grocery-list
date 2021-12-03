@@ -327,29 +327,32 @@ def link_handler(message):
     user_id = message.from_user.id
     if get_user_state(user_id) == 2:
         if get_user_day(user_id) >= 0:
-            n_day = get_user_n_days(user_id) - get_user_day(user_id) - 1
-            next_day = date.today() + datetime.timedelta(days=n_day)
-            print(next_day)
-            print(next_day.weekday())
-            day_nm = day_name[next_day.weekday()]
-            parser = ParserRecipe(url)
-            num_of_portions, ingredients = parser.pipe()
-            print(ingredients)
-            products = []
-            for name, quantity, units in ingredients:
-                name, quantity, u_units = unification(name, quantity, units)
-                if u_units == kilograms[0]:
-                    quantity *= 1000
-                    u_units = grams[0]
-                products.append(make_product(name, quantity, u_units))
-            description = url
-            name = parser.get_name()
-            add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, num_of_portions, products))
-            set_user_state(user_id, 6)
-            bot.send_message(user_id,
-                             "Сколько порций этого блюда вы будете готовить?",
-                             reply_markup=make_days_buttons()
-                             )
+            try:
+                n_day = get_user_n_days(user_id) - get_user_day(user_id) - 1
+                next_day = date.today() + datetime.timedelta(days=n_day)
+                print(next_day)
+                print(next_day.weekday())
+                day_nm = day_name[next_day.weekday()]
+                parser = ParserRecipe(url)
+                num_of_portions, ingredients = parser.pipe()
+                print(ingredients)
+                products = []
+                for name, quantity, units in ingredients:
+                    name, quantity, u_units = unification(name, quantity, units)
+                    if u_units == kilograms[0]:
+                        quantity *= 1000
+                        u_units = grams[0]
+                    products.append(make_product(name, quantity, u_units))
+                description = url
+                name = parser.get_name()
+                add_new_day(user_id, str(next_day), str(day_nm), make_new_recipe(name, description, num_of_portions, products))
+                set_user_state(user_id, 6)
+                bot.send_message(user_id,
+                                 "Сколько порций этого блюда вы будете готовить?",
+                                 reply_markup=make_days_buttons()
+                                 )
+            except (ValueError, NameError, AttributeError) as e:
+                bot.send_message(user_id, "Это не тот сайт или есть какие-то проблемы :(")
 
 
 @bot.message_handler(commands=['end_add'])
