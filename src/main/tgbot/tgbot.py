@@ -250,7 +250,11 @@ def show_recipes_handler(message):
 def have_product_handler(message):
     print("Here we go")
     user_id = message.from_user.id
-    text = message.json['reply_to_message']['text']
+    try:
+        text = message.json['reply_to_message']['text']
+    except KeyError as e:
+        bot.send_message(message.from_user.id, "Не надо так делать :(")
+        return
     if ':' not in text:
         add_to_available_products(user_id, text.strip(), 0, 'none')
     else:
